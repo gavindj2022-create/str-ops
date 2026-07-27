@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0F0F10">
+<title>STR Ops — Short Term Retreats</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="login" class="screen login-screen">
+  <div class="login-card">
+    <div class="brand-mark">
+      <span class="brand-serif">Short Term Retreats</span>
+      <span class="brand-sub">Team Operations</span>
+    </div>
+    <p class="login-hint">Tap your name, then enter your PIN.</p>
+    <div id="loginPeople" class="login-people"></div>
+    <div id="pinPad" class="pinpad hidden">
+      <p id="pinWho" class="pin-who"></p>
+      <div class="pin-dots"><span></span><span></span><span></span><span></span></div>
+      <div class="pin-grid">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button data-k="back" class="pin-alt">&#9003;</button><button data-k="0">0</button><button data-k="cancel" class="pin-alt">&times;</button>
+      </div>
+      <p id="pinError" class="pin-error"></p>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div id="avatar" class="avatar">A</div>
+      <div>
+        <p id="greeting" class="greeting">Morning, Anna</p>
+        <p id="dateline" class="dateline">Friday</p>
+      </div>
+    </div>
+    <button id="signout" class="icon-btn" aria-label="Sign out">&#8617;</button>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-view="today"><span class="tab-ico">&#9737;</span>Today</button>
+    <button class="tab" data-view="turns"><span class="tab-ico">&#10003;</span>Turns</button>
+    <button class="tab" data-view="water"><span class="tab-ico">&#9832;</span>Water</button>
+    <button class="tab" data-view="team"><span class="tab-ico">&#9776;</span>Team</button>
+  </nav>
+</div>
+
+<div id="sheet" class="sheet hidden">
+  <div class="sheet-backdrop" data-close></div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

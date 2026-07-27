@@ -1,0 +1,33 @@
+name = "str-ops"
+main = "worker/index.js"
+compatibility_date = "2026-07-01"
+pages_build_output_dir = "public"
+
+# Reuses the same Cloudflare account as the str-website project.
+# account_id = "2a34aeab729ff9e5650051c3059e6b0a"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "str-ops"
+# database_id = "<run: wrangler d1 create str-ops, then paste the id here>"
+
+# v2: private R2 bucket for verification / damage photos. Store only the key in D1.
+# Serve via signed URLs from the Worker — never make the bucket public.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "str-ops-photos"
+# create with: wrangler r2 bucket create str-ops-photos
+
+[triggers]
+crons = ["*/30 * * * *"]   # refresh Airbnb/VRBO feeds every 30 min
+
+# ── Secrets (set with `wrangler pages secret put <NAME> --project-name=str-ops`;
+#    never commit values — see .env.example for the full list) ──
+#
+# 7 iCal feeds (same names as str-website, BLOCKED on Anabelle/Gale exporting them):
+#   ICAL_MILPOINT_AIRBNB  ICAL_MILPOINT_VRBO  ICAL_WESTGATE_AIRBNB
+#   ICAL_GALENA_AIRBNB    ICAL_GALENA_VRBO    ICAL_HICKORY_AIRBNB  ICAL_HICKORY_VRBO
+# Web Push:
+#   VAPID_PUBLIC_KEY  VAPID_PRIVATE_KEY  VAPID_SUBJECT   (mailto: contact)
+# Auth:
+#   SESSION_SECRET    (HMAC key for signing session tokens)

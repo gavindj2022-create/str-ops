@@ -1,0 +1,13 @@
+{
+  "name": "STR Ops — Short Term Retreats",
+  "short_name": "STR Ops",
+  "description": "Team operations for Short Term Retreats: turnovers, pools, daily brief.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0F0F10",
+  "theme_color": "#0F0F10",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

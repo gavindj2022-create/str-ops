@@ -1,0 +1,21 @@
+# Secrets — never commit real values
+.dev.vars
+.env
+.env.local
+*.local
+
+# Cloudflare / wrangler
+.wrangler/
+.mf/
+dist/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+nul
+.vscode/
+.idea/
