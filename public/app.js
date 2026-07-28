@@ -84,21 +84,50 @@ function renderLogin(){
     const button=document.createElement('button');
     button.className='person-btn';
     button.innerHTML=`<span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
-      <span><span class="pn">${esc(person.name)}</span><span class="pr">${esc(displayRole(person))}</span><span class="pt">Test PIN ${esc(person.pin)}</span></span>`;
+      <span><span class="pn">${esc(person.name)}</span><span class="pr">${esc(displayRole(person))}</span></span>`;
     button.onclick=()=>openPin(person);
     wrap.appendChild(button);
   });
 }
 let pinTarget=null;
 let pinBuf='';
+const isLocalDemo=()=>['localhost','127.0.0.1'].includes(location.hostname)||location.protocol==='file:';
+async function attemptLogin(person,attempted,{showChecking=false,showErrors=false,quick=false}={}){
+  if(showChecking) $('#pinError').textContent='Checking PIN…';
+  try{
+    const result=await API.login(person.id,attempted);
+    const remoteUser=result?.user||result;
+    signIn({...person,...remoteUser,role:normalizeRole(remoteUser?.role||person.role)});
+    API_CONNECTED=true;
+    hydrateFromApi();
+    return true;
+  } catch(error){
+    if(!error?.status&&isLocalDemo()&&attempted===person.pin){
+      API_CONNECTED=false;
+      signIn(person);
+      toast('Local demo mode · changes stay on this device');
+      return true;
+    }
+    if(quick){
+      toast('Could not sign in. Refresh the local demo seed and try again.');
+    }else if(showErrors){
+      $('#pinError').textContent='Wrong PIN, try again';
+    }
+    return false;
+  }
+}
 function openPin(person){
   pinTarget=person;
   pinBuf='';
+  if(isLocalDemo()){
+    attemptLogin(person,person.pin,{quick:true});
+    return;
+  }
   $('.pin-dots').innerHTML='<span></span>'.repeat(person.pin.length);
   $('#loginPeople').classList.add('hidden');
   $('#pinPad').classList.remove('hidden');
-  $('#pinWho').textContent=`Enter ${person.pin.length}-digit PIN for ${person.name}`;
-  $('#pinError').textContent=`Test PIN: ${person.pin}`;
+  $('#pinWho').textContent=`Enter PIN for ${person.name}`;
+  $('#pinError').textContent='';
   drawDots();
 }
 function drawDots(){ $$('.pin-dots span').forEach((dot,index)=>dot.classList.toggle('on',index<pinBuf.length)); }
@@ -116,22 +145,8 @@ async function pinKey(key){
   if(pinBuf.length!==pinLength) return;
 
   const attempted=pinBuf;
-  $('#pinError').textContent='Checking PIN…';
-  try{
-    const result=await API.login(pinTarget.id,attempted);
-    const remoteUser=result?.user||result;
-    signIn({...pinTarget,...remoteUser,role:normalizeRole(remoteUser?.role||pinTarget.role)});
-    API_CONNECTED=true;
-    hydrateFromApi();
-  } catch(error){
-    const localDemo=['localhost','127.0.0.1'].includes(location.hostname)||location.protocol==='file:';
-    if(!error?.status&&localDemo&&attempted===pinTarget.pin){
-      API_CONNECTED=false;
-      signIn(pinTarget);
-      toast('Local demo mode · changes stay on this device');
-      return;
-    }
-    $('#pinError').textContent='Wrong PIN, try again';
+  const ok=await attemptLogin(pinTarget,attempted,{showChecking:true,showErrors:true});
+  if(!ok){
     pinBuf='';
     setTimeout(drawDots,180);
   }

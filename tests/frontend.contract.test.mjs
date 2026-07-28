@@ -81,9 +81,12 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   assert.match(app,/if\(view==='cockpit'&&!isLeader\(\)\) view='today'/);
   assert.match(app,/repeat\(person\.pin\.length\)/);
   assert.match(app,/pinTarget\?\.pin\?\.length\|\|4/);
+  assert.match(app,/isLocalDemo\(\)/);
+  assert.match(app,/attemptLogin\(person,person\.pin,\{quick:true\}\)/);
   assert.match(app,/startedAt:true/);
   assert.match(app,/Cloud sync failed/);
-  for(const phrase of ['I’m on it','Done · ready for guest','Report damage or issue','balanced-log streak','Ops cockpit','Test PIN']){
+  assert.ok(!app.includes('Test'+' PIN'),'login cards should not show demo credentials');
+  for(const phrase of ['I’m on it','Done · ready for guest','Report damage or issue','balanced-log streak','Ops cockpit']){
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
   assert.match(css,/@media \(max-width:390px\)/);

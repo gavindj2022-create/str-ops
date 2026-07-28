@@ -28,7 +28,6 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .person-btn .pa{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:500;flex-shrink:0}
 .person-btn .pn{display:block;font-size:15px;font-weight:500;line-height:1.2}
 .person-btn .pr{display:block;font-size:12px;color:var(--muted)}
-.person-btn .pt{display:block;font-size:11px;color:var(--gold);margin-top:3px}
 .pinpad{margin-top:8px}
 .pin-who{text-align:center;font-size:15px;margin-bottom:14px;color:var(--muted)}
 .pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:22px}

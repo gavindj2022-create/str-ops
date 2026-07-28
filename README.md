@@ -29,9 +29,9 @@ npm install
 npm run test-version
 ```
 
-Open `http://127.0.0.1:8787`.
+Open `http://127.0.0.1:8787`. In local test mode, tap a name to sign in.
 
-Demo PINs:
+Fallback demo PINs:
 
 | Person | Role | PIN |
 |---|---|---|

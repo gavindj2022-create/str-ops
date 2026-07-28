@@ -15,8 +15,9 @@ npm install
 npm run test-version
 ```
 
-Open `http://127.0.0.1:8787`. Test PINs are Gav (Dev) `135790`, Gale (Owner) `975310`,
-Larry (House Manager) `246810`, and Anna (Worker) `1111`.
+Open `http://127.0.0.1:8787`. Local test mode signs in when a name is tapped. Fallback
+PINs are Gav (Dev) `135790`, Gale (Owner) `975310`, Larry (House Manager) `246810`,
+and Anna (Worker) `1111`.
 
 Completed in this checkpoint:
 
@@ -74,7 +75,7 @@ Working v1 demo, verified in-browser. Runs with no build step:
 ```bash
 python -m http.server 8123 --directory public   # then open http://localhost:8123
 ```
-Test PINs today: Gav 135790, Gale 975310, Larry 246810, Anna 1111.
+Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Anna 1111.
 
 - `public/index.html` — app shell + tab bar. `public/styles.css` — the **dark-luxury design
   system** (near-black `#0F0F10`, bone `#F4F1EC`, gold `#C9A46B`, teal `#1F4E5F`, red
@@ -128,7 +129,8 @@ Anything Gav later corrects overrides these — keep them in one place so they'r
 - **cleaner** = Anna, shown in the UI as Worker; the **cockpit tab is hidden**.
 
 Keep `isLeaderRole()` true for `dev|owner|manager`, and use `isOwner()` only where
-Gale-level ownership is required. The login screen shows visible local-test PINs.
+Gale-level ownership is required. Local test mode signs in by tapping a person; non-local
+environments still use the PIN pad.
 
 ---
 
