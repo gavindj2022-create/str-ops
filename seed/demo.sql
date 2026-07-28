@@ -18,18 +18,20 @@ ON CONFLICT(id) DO UPDATE SET
 INSERT INTO team
   (id, name, role, pin_hash, pin_salt, pin_iterations, color, active)
 VALUES
-  ('gav', 'Gav', 'owner', 'jgWjxq3_jSz18sju4A1VLAzj6_Z-Ih_fRImMctcLjFw',
-   'str-ops-demo-gav-v2', 120000, '#E0A94B', 1),
-  ('anna', 'Anna', 'manager', '7FboY8cbLlINwTCB1BaNtED3kEnJlXxSZ8CJJF2Y1jk',
-   'str-ops-demo-anna-v2', 120000, '#C9A46B', 1),
-  ('maria', 'Maria', 'cleaner', 'X-KBHr0Fi31ycemW_ZLRbi2ZPMfrBrWOLuvpOQJNUxc',
-   'str-ops-demo-maria-v2', 120000, '#4FB0C6', 1),
-  ('jess', 'Jess', 'cleaner', 'ud1a35POxOMqvYQxFCAm6i1lz0IdpXBED6Ie6S0i7uo',
-   'str-ops-demo-jess-v2', 120000, '#5BB98B', 1)
+  ('gav', 'Gav', 'dev', 'q6HWfs04eXVTz7A4Mhg21OQYtLSL1LzrJ9_ge8-lHPk',
+   'str-ops-demo-gav-v3', 120000, '#E0A94B', 1),
+  ('gale', 'Gale', 'owner', 'rM05CnzOn6fc_0TEMJBNXBgU6aguIXXBSRbWZDV02BU',
+   'str-ops-demo-gale-v3', 120000, '#C9A46B', 1),
+  ('larry', 'Larry', 'manager', 'SURJnMYJPBLwkQKD4LS1GMCtK9eJ0ISLs2Uyp2G-mP4',
+   'str-ops-demo-larry-v3', 120000, '#4FB0C6', 1),
+  ('anna', 'Anna', 'cleaner', 'RLdDtiJ9mcN3d1MekVMVatjk4C3-L1V02bJuCF7M4X4',
+   'str-ops-demo-anna-v3', 120000, '#5BB98B', 1)
 ON CONFLICT(id) DO UPDATE SET
   name=excluded.name, role=excluded.role, pin_hash=excluded.pin_hash,
   pin_salt=excluded.pin_salt, pin_iterations=excluded.pin_iterations,
   color=excluded.color, active=excluded.active;
+
+UPDATE team SET active=0 WHERE id IN ('maria', 'jess');
 
 INSERT INTO checklist_templates (id, property_id, items) VALUES
   ('checklist-millpoint', 'millpoint',
@@ -54,11 +56,11 @@ INSERT INTO turns
    status, assigned_to, source, updated_ts)
 VALUES
   ('demo-turn-westgate', 'westgate', date('now', '-5 hours'), date('now', '-5 hours', '+2 day'), '10:00', '16:00',
-   0, 'needs_cleaning', 'maria', 'seed', datetime('now')),
+   0, 'needs_cleaning', 'anna', 'seed', datetime('now')),
   ('demo-turn-hickory', 'hickory', date('now', '-5 hours'), date('now', '-5 hours'), '10:00', '16:00',
    1, 'needs_cleaning', NULL, 'seed', datetime('now')),
   ('demo-turn-millpoint', 'millpoint', date('now', '-5 hours'), date('now', '-5 hours', '+1 day'), '10:00', '16:00',
-   0, 'in_progress', 'jess', 'seed', datetime('now')),
+   0, 'in_progress', 'anna', 'seed', datetime('now')),
   ('demo-turn-galena', 'galena', date('now', '-5 hours', '+1 day'), date('now', '-5 hours', '+3 day'), '10:00', '16:00',
    0, 'needs_cleaning', NULL, 'seed', datetime('now')),
   ('demo-turn-westgate-next', 'westgate', date('now', '-5 hours', '+4 day'), date('now', '-5 hours', '+6 day'), '10:00', '16:00',
@@ -81,7 +83,7 @@ ON CONFLICT(id) DO UPDATE SET
 INSERT INTO maintenance_tickets
   (id, property_id, opened_ts, opened_by, note, priority, status)
 VALUES
-  ('demo-ticket-1', 'westgate', datetime('now', '-2 hour'), 'maria',
+  ('demo-ticket-1', 'westgate', datetime('now', '-2 hour'), 'anna',
    'Patio string lights are out near the pool gate.', 'normal', 'open')
 ON CONFLICT(id) DO UPDATE SET status='open', closed_ts=NULL;
 
@@ -100,7 +102,7 @@ INSERT INTO owner_tasks
   (id, title, property_id, due_date, done, recurring, assigned_to, priority, notes, created_ts)
 VALUES
   ('demo-task-overdue', 'Replace Westgate patio string lights', 'westgate',
-   date('now', '-5 hours', '-1 day'), 0, NULL, 'anna', 'urgent', 'Coordinate after the next checkout', datetime('now')),
+   date('now', '-5 hours', '-1 day'), 0, NULL, 'larry', 'urgent', 'Coordinate after the next checkout', datetime('now')),
   ('demo-task-kayaks', 'Order Millpoint kayak life jackets', 'millpoint',
    date('now', '-5 hours', '+4 day'), 0, NULL, 'gav', 'normal', NULL, datetime('now'))
 ON CONFLICT(id) DO UPDATE SET

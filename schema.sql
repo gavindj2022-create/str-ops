@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS properties (
 CREATE TABLE IF NOT EXISTS team (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'cleaner')),
+  role TEXT NOT NULL CHECK (role IN ('dev', 'owner', 'manager', 'cleaner')),
   pin_hash TEXT NOT NULL,
   pin_salt TEXT NOT NULL,
   pin_iterations INTEGER NOT NULL DEFAULT 120000,

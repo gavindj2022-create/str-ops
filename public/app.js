@@ -11,8 +11,10 @@ const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
 const prop=id=>PROPERTIES.find(item=>item.id===id)||{id,name:'Unknown property',location:'',hasPool:false,hasHotTub:false};
 const member=id=>TEAM.find(item=>item.id===id)||null;
 const normalizeRole=role=>role==='admin'?'manager':role;
-const isLeader=()=>USER&&['owner','manager'].includes(normalizeRole(USER.role));
-const roleLabel=role=>({owner:'Owner',manager:'Manager',cleaner:'Cleaner',admin:'Manager'}[role]||'Team');
+const isLeaderRole=role=>['dev','owner','manager'].includes(normalizeRole(role));
+const isLeader=()=>USER&&isLeaderRole(USER.role);
+const roleLabel=role=>({dev:'Dev',owner:'Owner',manager:'House Manager',cleaner:'Worker',admin:'House Manager'}[role]||'Team');
+const displayRole=person=>person?.title||roleLabel(normalizeRole(person?.role));
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const HEAD_TINT={millpoint:'#1F4E5F',westgate:'#6b4f8a',galena:'#8a6b4f',hickory:'#2E6E82'};
 
@@ -82,7 +84,7 @@ function renderLogin(){
     const button=document.createElement('button');
     button.className='person-btn';
     button.innerHTML=`<span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
-      <span><span class="pn">${esc(person.name)}</span><span class="pr">${roleLabel(normalizeRole(person.role))}</span></span>`;
+      <span><span class="pn">${esc(person.name)}</span><span class="pr">${esc(displayRole(person))}</span><span class="pt">Test PIN ${esc(person.pin)}</span></span>`;
     button.onclick=()=>openPin(person);
     wrap.appendChild(button);
   });
@@ -95,8 +97,8 @@ function openPin(person){
   $('.pin-dots').innerHTML='<span></span>'.repeat(person.pin.length);
   $('#loginPeople').classList.add('hidden');
   $('#pinPad').classList.remove('hidden');
-  $('#pinWho').textContent=`Enter PIN for ${person.name}`;
-  $('#pinError').textContent='';
+  $('#pinWho').textContent=`Enter ${person.pin.length}-digit PIN for ${person.name}`;
+  $('#pinError').textContent=`Test PIN: ${person.pin}`;
   drawDots();
 }
 function drawDots(){ $$('.pin-dots span').forEach((dot,index)=>dot.classList.toggle('on',index<pinBuf.length)); }
@@ -287,7 +289,7 @@ function openTurn(id){
     const assigned=member(turn.assigned);
     const who=assigned?.name||(turn.assigned?'Assigned team member':'Unassigned');
     body+=`<div class="row"><span class="pa" style="background:${assigned?.color||'#2b2b30'}">${esc(who[0]||'?')}</span>
-      <div><div class="rn">${esc(who)}</div><div class="rr">Assigned cleaner</div></div>
+      <div><div class="rn">${esc(who)}</div><div class="rr">Assigned worker</div></div>
       <button class="assign-chip" data-assign="${turn.id}">${turn.assigned?'Reassign':'Assign'}</button></div>`;
   }
   groups.forEach(group=>{
@@ -397,7 +399,7 @@ function openIssue(turnId){
   const turn=S.turns.find(item=>item.id===turnId);
   if(!turn) return;
   openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Report damage or issue</div>
-    <div class="sheet-sub">${esc(prop(turn.propertyId).name)} · alerts the owner team</div>
+    <div class="sheet-sub">${esc(prop(turn.propertyId).name)} - alerts the leadership team</div>
     <div class="reading-grid issue-grid">
       <div class="field"><label>Type</label><select id="issue-category">
         <option value="damage">Damage</option><option value="maintenance">Maintenance</option>
@@ -428,7 +430,7 @@ function submitIssue(turnId){
   commit(()=>{ S.tickets.unshift(ticket); S.alerts.unshift(alert); },()=>API.tickets.create(ticket),{render:false});
   closeSheet();
   go(VIEW);
-  toast('Issue sent to the owner team');
+  toast('Issue sent to the leadership team');
 }
 
 /* ---------------- Water ---------------- */
@@ -533,7 +535,7 @@ function exportCompliance(){
   setTimeout(()=>printWindow.print(),300);
 }
 
-/* ---------------- Owner cockpit ---------------- */
+/* ---------------- Ops cockpit ---------------- */
 function money(cents){ return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format((Number(cents)||0)/100); }
 function goalDisplay(goal,value){
   if(goal.unit==='cents') return money(value);
@@ -550,19 +552,19 @@ function renderCockpit(){
   const net=totals.revenue-totals.expenses-totals.payouts;
   const openAlerts=S.alerts.filter(alert=>!alert.resolved);
   const openTasks=S.tasks.filter(task=>task.status!=='done');
-  let html=`<div class="cockpit-head"><div><span class="eyebrow">Owner cockpit</span><h1>The business, at a glance.</h1></div>
+  let html=`<div class="cockpit-head"><div><span class="eyebrow">Ops cockpit</span><h1>The business, at a glance.</h1></div>
     <span class="live-dot ${API_CONNECTED?'online':''}">${API_CONNECTED?'Live':'Demo'}</span></div>
     <div class="money-grid">
       <div class="money-card hero"><small>Revenue</small><b>${money(totals.revenue)}</b><span>this month</span></div>
       <div class="money-card"><small>Net operating</small><b>${money(net)}</b><span>after costs + payouts</span></div>
       <div class="money-card"><small>Property costs</small><b>${money(totals.expenses)}</b><span>recorded expenses</span></div>
-      <div class="money-card"><small>Cleaner pay</small><b>${money(totals.payouts)}</b><span>projected payouts</span></div>
+      <div class="money-card"><small>Worker pay</small><b>${money(totals.payouts)}</b><span>projected payouts</span></div>
     </div>
     <div class="section-heading"><p class="sec-label">Needs attention</p><span>${openAlerts.length} open</span></div>
     <div class="alert-stack">${openAlerts.map(alertCard).join('')}</div>
     <div class="section-heading"><p class="sec-label">Goals</p><span>${S.goals.length} tracked</span></div>
     <div class="goal-list">${S.goals.map(goalCard).join('')}</div>
-    <div class="section-heading"><p class="sec-label">Owner tasks</p><button data-addtask>+ Add</button></div>
+    <div class="section-heading"><p class="sec-label">Ops tasks</p><button data-addtask>+ Add</button></div>
     <div class="task-list">${openTasks.length?openTasks.map(taskCard).join(''):'<div class="empty compact-empty">No open tasks.</div>'}</div>
     <div class="section-heading"><p class="sec-label">Property numbers</p><button data-addfinancial>+ Add</button></div>
     <div class="finance-list">${S.financials.map(financialRow).join('')}</div>`;
@@ -593,11 +595,11 @@ function financialRow(row){
     <div><strong>${money(row.revenueCents)}</strong><small>${money(net)} net</small></div></div>`;
 }
 function openTaskForm(){
-  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Add owner task</div>
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Add ops task</div>
     <div class="field"><label>Task</label><input id="task-title" maxlength="120" placeholder="What needs to happen?"></div>
     <div class="reading-grid issue-grid">
       <div class="field"><label>Property</label><select id="task-property">${PROPERTIES.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
-      <div class="field"><label>Owner</label><select id="task-owner">${TEAM.filter(item=>item.role!=='cleaner').map(item=>`<option value="${item.id}">${esc(item.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Assigned to</label><select id="task-owner">${TEAM.filter(item=>isLeaderRole(item.role)).map(item=>`<option value="${item.id}">${esc(item.name)}</option>`).join('')}</select></div>
     </div>
     <div class="reading-grid issue-grid">
       <div class="field"><label>Due date</label><input id="task-due" type="date" value="${addDays(1)}"></div>
@@ -626,7 +628,7 @@ function openFinancialForm(){
     <div class="field"><label>Revenue ($)</label><input id="fin-revenue" type="number" min="0" step="1" inputmode="decimal"></div>
     <div class="reading-grid issue-grid">
       <div class="field"><label>Expenses ($)</label><input id="fin-expenses" type="number" min="0" step="1"></div>
-      <div class="field"><label>Cleaner payouts ($)</label><input id="fin-payouts" type="number" min="0" step="1"></div>
+      <div class="field"><label>Worker payouts ($)</label><input id="fin-payouts" type="number" min="0" step="1"></div>
     </div>
     <button class="btn primary" data-savefinancial>Save snapshot</button>`);
 }
@@ -653,13 +655,13 @@ function saveFinancial(){
 function renderTeam(){
   let html=`<p class="sec-label">The team</p>`;
   html+=TEAM.map(person=>`<div class="row"><span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
-    <div><div class="rn">${esc(person.name)}</div><div class="rr">${roleLabel(normalizeRole(person.role))}${person.role==='owner'?' · business + operations':person.role==='manager'?' · operations control':''}</div></div>
-    <span class="badge ${person.role!=='cleaner'?'admin':''}">${roleLabel(normalizeRole(person.role))}</span></div>`).join('');
+    <div><div class="rn">${esc(person.name)}</div><div class="rr">${esc(displayRole(person))}${person.role==='dev'?' - app build + test access':person.role==='owner'?' - business owner':person.role==='manager'?' - house operations':''}</div></div>
+    <span class="badge ${person.role!=='cleaner'?'admin':''}">${esc(displayRole(person))}</span></div>`).join('');
   if(isLeader()){
     html+=`<p class="sec-label">Leader tools</p>
       <button class="btn ghost" data-autoassign>&#9851; Auto-assign open turns</button>
       <button class="btn danger-outline" data-reset>Reset local demo</button>
-      <p class="admin-note">Signed in as ${esc(USER.name)} · ${roleLabel(USER.role)}.</p>`;
+      <p class="admin-note">Signed in as ${esc(USER.name)} - ${esc(displayRole(USER))}.</p>`;
   } else {
     html+=`<p class="admin-note">You can claim available turns, complete your checklist, log water, and report issues.</p>`;
   }
@@ -685,7 +687,7 @@ function openAssign(turnId){
   const cleaners=TEAM.filter(person=>person.role==='cleaner');
   const load=id=>S.turns.filter(item=>item.assigned===id&&item.status!=='done').length;
   const suggested=[...cleaners].sort((a,b)=>load(a.id)-load(b.id))[0];
-  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Assign cleaner</div>
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Assign worker</div>
     <div class="sheet-sub">${esc(prop(turn.propertyId).name)} · ${fmtDay(turn.checkout)}</div>
     <div class="gate-note water-note"><span>&#9851;</span><span>Suggested: <b>${esc(suggested.name)}</b>, with the fewest open turns.</span></div>
     <div class="pick-list">${cleaners.map(cleaner=>`<button data-pick="${turn.id}:${cleaner.id}" class="${cleaner.id===suggested.id?'sel':''}">
@@ -698,7 +700,7 @@ function pickCleaner(turnId,cleanerId){
   commit(()=>{ turn.assigned=cleanerId; },()=>API.patchTurn(turnId,{assigned:cleanerId}),{render:false});
   closeSheet();
   go(VIEW);
-  toast('Cleaner assigned');
+  toast('Worker assigned');
 }
 
 /* ---------------- reminders, sheet, bindings ---------------- */

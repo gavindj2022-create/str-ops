@@ -38,8 +38,8 @@ test('parseICal unfolds lines, preserves times, and skips availability blocks', 
 
 test('demo PIN hash matches the seeded PBKDF2 hash', async () => {
   assert.equal(
-    await hashPin('246810', 'str-ops-demo-anna-v2', 120000),
-    '7FboY8cbLlINwTCB1BaNtED3kEnJlXxSZ8CJJF2Y1jk',
+    await hashPin('246810', 'str-ops-demo-larry-v3', 120000),
+    'SURJnMYJPBLwkQKD4LS1GMCtK9eJ0ISLs2Uyp2G-mP4',
   );
 });
 
@@ -86,7 +86,7 @@ test('SQL adapters return camelCase and money stays in cents', () => {
     checkin_time: '16:00',
     same_day: 1,
     status: 'needs_cleaning',
-    assigned_to: 'maria',
+    assigned_to: 'anna',
     started_at: null,
     completed_at: null,
     source: 'seed',
@@ -95,6 +95,6 @@ test('SQL adapters return camelCase and money stays in cents', () => {
   });
   assert.equal(turn.propertyId, 'westgate');
   assert.equal(turn.sameDay, true);
-  assert.equal(turn.assignedTo, 'maria');
+  assert.equal(turn.assignedTo, 'anna');
   assert.ok(!('assigned_to' in turn));
 });

@@ -66,10 +66,10 @@ const CHECKLISTS = {
 };
 
 const TEAM = [
-  { id:'gav',   name:'Gav',   role:'owner',   pin:'135790', color:'#E0A94B' },
-  { id:'anna',  name:'Anna',  role:'manager', pin:'246810', color:'#C9A46B' },
-  { id:'maria', name:'Maria', role:'cleaner', pin:'1111', color:'#4FB0C6' },
-  { id:'jess',  name:'Jess',  role:'cleaner', pin:'2222', color:'#5BB98B' },
+  { id:'gav',   name:'Gav',   role:'dev',     title:'Dev',           pin:'135790', color:'#E0A94B' },
+  { id:'gale',  name:'Gale',  role:'owner',   title:'Owner',         pin:'975310', color:'#C9A46B' },
+  { id:'larry', name:'Larry', role:'manager', title:'House Manager', pin:'246810', color:'#4FB0C6' },
+  { id:'anna',  name:'Anna',  role:'cleaner', title:'Worker',        pin:'1111',   color:'#5BB98B' },
 ];
 
 /* ---- date helpers ---- */
@@ -83,9 +83,9 @@ function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return iso(d)
 /* Seed turns emulate what the Airbnb iCal feed will provide (checkout=clean-by). */
 function seedTurns(){
   return [
-    { id:'t1', propertyId:'westgate', checkout:addDays(0), checkin:addDays(2), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:'maria' },
+    { id:'t1', propertyId:'westgate', checkout:addDays(0), checkin:addDays(2), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:'anna' },
     { id:'t2', propertyId:'hickory',  checkout:addDays(0), checkin:addDays(0), checkoutTime:'10:00', readyBy:'15:30', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
-    { id:'t3', propertyId:'millpoint',checkout:addDays(0), checkin:addDays(1), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'in_progress', assigned:'jess' },
+    { id:'t3', propertyId:'millpoint',checkout:addDays(0), checkin:addDays(1), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'in_progress', assigned:'anna' },
     { id:'t4', propertyId:'galena',   checkout:addDays(1), checkin:addDays(3), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
     { id:'t5', propertyId:'westgate', checkout:addDays(4), checkin:addDays(6), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
   ];
@@ -109,9 +109,9 @@ function seedFinancials(){
 }
 function seedTasks(){
   return [
-    { id:'task1', title:'Replace Westgate patio string lights', propertyId:'westgate', assigneeId:'anna', priority:'high', dueDate:addDays(1), status:'open' },
+    { id:'task1', title:'Replace Westgate patio string lights', propertyId:'westgate', assigneeId:'larry', priority:'high', dueDate:addDays(1), status:'open' },
     { id:'task2', title:'Order Millpoint kayak life jackets', propertyId:'millpoint', assigneeId:'gav', priority:'normal', dueDate:addDays(4), status:'open' },
-    { id:'task3', title:'Confirm Hickory HVAC service', propertyId:'hickory', assigneeId:'anna', priority:'high', dueDate:addDays(-1), status:'open' },
+    { id:'task3', title:'Confirm Hickory HVAC service', propertyId:'hickory', assigneeId:'larry', priority:'high', dueDate:addDays(-1), status:'open' },
   ];
 }
 function seedGoals(){

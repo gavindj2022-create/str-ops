@@ -94,7 +94,11 @@ try {
 
   const options = await api('/api/login-options');
   assert.equal(options.response.status, 200);
-  assert.ok(options.payload.users.some(user => user.id === 'anna' && user.role === 'manager'));
+  assert.ok(options.payload.users.some(user => user.id === 'gav' && user.role === 'dev'));
+  assert.ok(options.payload.users.some(user => user.id === 'gale' && user.role === 'owner'));
+  assert.ok(options.payload.users.some(user => user.id === 'larry' && user.role === 'manager'));
+  assert.ok(options.payload.users.some(user => user.id === 'anna' && user.role === 'cleaner'));
+  assert.equal(options.payload.users.some(user => ['maria', 'jess'].includes(user.id)), false);
   assert.equal(JSON.stringify(options.payload).toLowerCase().includes('pin'), false);
 
   const anonymousState = await api('/api/state');
@@ -103,7 +107,7 @@ try {
 
   const managerLogin = await api('/api/login', {
     method: 'POST',
-    body: { teamId: 'anna', pin: '246810' },
+    body: { teamId: 'larry', pin: '246810' },
   });
   assert.equal(managerLogin.response.status, 200);
   assert.equal(managerLogin.payload.user.role, 'manager');
@@ -171,7 +175,7 @@ try {
 
   const cleanerLogin = await api('/api/login', {
     method: 'POST',
-    body: { teamId: 'maria', pin: '1111' },
+    body: { teamId: 'anna', pin: '1111' },
   });
   assert.equal(cleanerLogin.response.status, 200);
   const cleanerCookie = cookieFrom(cleanerLogin.response);
@@ -196,7 +200,7 @@ try {
   const legacyBrokenClaim = await api('/api/turns/demo-turn-hickory', {
     method: 'PATCH',
     cookie: cleanerCookie,
-    body: { assigned: 'maria', status: 'in_progress' },
+    body: { assigned: 'anna', status: 'in_progress' },
   });
   assert.equal(legacyBrokenClaim.response.status, 403);
 
@@ -206,7 +210,7 @@ try {
     body: { status: 'in_progress', startedAt: true },
   });
   assert.equal(cleanerClaim.response.status, 200);
-  assert.equal(cleanerClaim.payload.assigned, 'maria');
+  assert.equal(cleanerClaim.payload.assigned, 'anna');
   assert.ok(cleanerClaim.payload.startedAt);
 
   const prematureDone = await api('/api/turns/demo-turn-hickory', {

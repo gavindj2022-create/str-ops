@@ -92,7 +92,7 @@ function timestampValue(value, field) {
 }
 
 function manager(user) {
-  return ['owner', 'manager'].includes(user.role);
+  return ['dev', 'owner', 'manager'].includes(user.role);
 }
 
 async function stateResponse(env, user) {
@@ -280,14 +280,14 @@ async function handleTurns(request, env, user, parts) {
   if (!manager(user)) {
     const claiming = !current.assigned_to && body.startedAt;
     if (current.assigned_to !== user.id && !claiming) {
-      throw new HttpError(403, 'forbidden', 'Cleaners can update only their assigned turn.');
+      throw new HttpError(403, 'forbidden', 'Workers can update only their assigned turn.');
     }
     const forbidden = Object.keys(body).some(key =>
       !['status', 'startedAt', 'completedAt'].includes(key),
     );
     if (forbidden) throw new HttpError(403, 'forbidden', 'That turn field requires manager access.');
     if (body.status !== undefined && !['in_progress', 'ready', 'done'].includes(body.status)) {
-      throw new HttpError(403, 'forbidden', 'Cleaners cannot move a turn back to that status.');
+      throw new HttpError(403, 'forbidden', 'Workers cannot move a turn back to that status.');
     }
   }
   if (body.status === 'done') await assertTurnReady(env, current);
@@ -347,7 +347,7 @@ async function handleTurnChecks(request, env, user, turnId, rawIndex) {
   }
   if (request.method !== 'PUT') return methodNotAllowed(['PUT']);
   if (!manager(user) && turn.assigned_to !== user.id) {
-    throw new HttpError(403, 'forbidden', 'This checklist belongs to another cleaner.');
+    throw new HttpError(403, 'forbidden', 'This checklist belongs to another worker.');
   }
   const itemIdx = integer(rawIndex, 'itemIdx', { min: 0, max: 500 });
   const body = await readJson(request);

@@ -4,7 +4,7 @@
 Everything below is decided. Where something is still open it is marked **ASSUMPTION** with a
 safe default — build the default, do not stop to ask.
 
-## Current test-build checkpoint — 2026-07-27
+## Current test-build checkpoint — 2026-07-28
 
 A runnable v2 local test version now exists on branch `codex/str-ops-v2-test`.
 
@@ -15,17 +15,17 @@ npm install
 npm run test-version
 ```
 
-Open `http://127.0.0.1:8787`. Test PINs are Gav `135790`, Anna `246810`, Maria `1111`,
-and Jess `2222`.
+Open `http://127.0.0.1:8787`. Test PINs are Gav (Dev) `135790`, Gale (Owner) `975310`,
+Larry (House Manager) `246810`, and Anna (Worker) `1111`.
 
 Completed in this checkpoint:
 
 - Unified Worker plus static-assets runtime, D1 migrations, idempotent demo seed, R2
   binding, authenticated sessions, rate limiting, role enforcement, audit log, computed
   alerts, and booking/iCal reconciliation
-- Owner/manager/cleaner role migration
-- Owner cockpit with financials, tasks, alerts, goals, and property snapshots
-- Cleaner claim/start state, turnover windows, issue reporting, water streak, two-day
+- Dev/owner/house-manager/worker role migration
+- Ops cockpit with financials, tasks, alerts, goals, and property snapshots
+- Worker claim/start state, turnover windows, issue reporting, water streak, two-day
   test cadence, and phone-width layout
 - Progressive API adapter with a localStorage fallback for the test/demo experience
 - Authenticated R2 verification-photo upload, server-enforced checklist/photo gate, and
@@ -51,18 +51,17 @@ conflicts with this checkpoint, this checkpoint is authoritative.
 A **private, phone-first PWA** for **Short Term Retreats (STR)** — 4 waterfront Airbnb
 rentals near Peoria, IL, run by a tiny team. It shows the team exactly what to clean and
 when (driven by the Airbnb calendar), logs pool + hot tub chemistry, and gives one daily
-overview. **v2 adds an Owner cockpit** (business numbers, tasks/schedule, an exceptions
-feed, goals) for Gav and Anna.
+overview. **v2 adds an Ops cockpit** (business numbers, tasks/schedule, an exceptions
+feed, goals) for Gav, Gale, and Larry.
 
 - **This is an internal tool, NOT a SaaS.** No sign-up, no multi-tenant, no billing. Do not
   build any of that.
 - **Standalone.** Do NOT wire this into Limitless, Alfred, Discord, or any other system.
-- **Owner:** Gav (Gavin Johnson). **Runs it day-to-day:** Anna (Anabelle, Head Ops Manager,
-  Airbnb listing owner). Cleaners do turnovers.
+- **Dev:** Gav (Gavin Johnson). **Owner:** Gale. **House manager:** Larry. **Worker:** Anna.
 
 ### GO-LIVE BLOCKER (call this out to Gav, do not let it stall the build)
-The turnover calendar needs **7 Airbnb/VRBO `.ics` export URLs**. Only the listing owner
-(Anabelle) or a full-access co-host (Gale) can export them — Gav's co-host account can't.
+The turnover calendar needs **7 Airbnb/VRBO `.ics` export URLs**. Gale or Larry should
+export them from the listing calendars. Gav's account should not be treated as the owner.
 **They have never been captured.** Until they arrive, **build and demo entirely on seed
 data** (already in `public/data.js`). The live cutover is a one-step swap (§7). Do not block
 any feature on this.
@@ -75,7 +74,7 @@ Working v1 demo, verified in-browser. Runs with no build step:
 ```bash
 python -m http.server 8123 --directory public   # then open http://localhost:8123
 ```
-Test PINs today: Gav 135790, Anna 246810, Maria 1111, Jess 2222.
+Test PINs today: Gav 135790, Gale 975310, Larry 246810, Anna 1111.
 
 - `public/index.html` — app shell + tab bar. `public/styles.css` — the **dark-luxury design
   system** (near-black `#0F0F10`, bone `#F4F1EC`, gold `#C9A46B`, teal `#1F4E5F`, red
@@ -95,7 +94,7 @@ Test PINs today: Gav 135790, Anna 246810, Maria 1111, Jess 2222.
 - `wrangler.toml` — D1 + R2 bindings, cron, secret notes. `.env.example` — every secret.
 
 Features already built in the demo: PIN login, turnover board (iCal-shaped), per-property
-checklists, photo-verified ready gate, auto-assign cleaners, pool/hot-tub log with dosing
+checklists, photo-verified ready gate, auto-assign workers, pool/hot-tub log with dosing
 hints + status, compliance PDF export, same-day-turn red flag.
 
 ---
@@ -106,10 +105,10 @@ hints + status, compliance PDF export, same-day-turn red flag.
 |---|---|
 | Product type | Internal tool only. No SaaS/multi-tenant/billing. |
 | Reminders | **Web Push + in-app only.** No SMS, no email provider. (ASSUMPTION: push is enough; skip the email digest for now.) |
-| Roles | `owner` (Gav), `manager` (Anna), `cleaner`. See §3. |
-| Cockpit access | Owner **and** manager see the cockpit. **ASSUMPTION: the money/business numbers are visible to both Anna and Gav** (Gav did not restrict it). Tasks/schedule/alerts/goals are shared. |
-| Team roster | ASSUMPTION: Anna, Gav + demo cleaners Maria & Jess stand in until Gav gives real names. Keep them editable in the admin panel. Gale not seeded (add as `manager` if Gav asks). |
-| Cleaner visibility | ASSUMPTION: cleaners see **all** turns (matches v1). Assigned turns are highlighted. |
+| Roles | `dev` (Gav), `owner` (Gale), `manager` (Larry), `cleaner` (Anna). See §3. |
+| Cockpit access | Dev, owner, and house manager see the cockpit. Tasks/schedule/alerts/goals are shared. |
+| Team roster | Seed the actual test roster: Gav, Gale, Larry, Anna. Maria and Jess are stale demo users and should stay inactive. |
+| Worker visibility | ASSUMPTION: workers see **all** turns (matches v1). Assigned turns are highlighted. |
 | Money source | ASSUMPTION: **manual entry** per property/month in the cockpit; occupancy is **derived** from turns/feed. Wire a "pull from feed × nightly rate" helper but do not depend on it. |
 | Pool test cadence | ASSUMPTION: **due every 2 days**; overdue → alerts feed. Make the interval a constant that's easy to change. |
 | Ready-by time | ASSUMPTION: same-day turns flag against a **4:00pm** check-in unless the feed gives a real time. |
@@ -122,51 +121,49 @@ Anything Gav later corrects overrides these — keep them in one place so they'r
 
 ## 3. Role model migration
 
-`team.role` today is `admin|cleaner`. Move to **`owner|manager|cleaner`**:
-- **owner** = Gav — everything a manager can do + owns code/config.
-- **manager** = Anna — assign cleaners, edit checklist templates, manage team, re-open
-  anything, and see the cockpit.
-- **cleaner** = basic turn view only; the **cockpit tab is hidden**.
+`team.role` now supports **`dev|owner|manager|cleaner`**:
+- **dev** = Gav, app build and test access.
+- **owner** = Gale, business owner.
+- **manager** = Larry, house manager with operations control.
+- **cleaner** = Anna, shown in the UI as Worker; the **cockpit tab is hidden**.
 
-Do this atomically (both `data.js` seed roles and every `role==='admin'` check in `app.js`)
-so the demo never breaks. Replace the `isAdmin()` helper with `isManager()` (true for
-`owner|manager`) and add `isOwner()` where only Gav-level applies. The login screen already
-labels admins "Manager" — keep owner labeled "Owner".
+Keep `isLeaderRole()` true for `dev|owner|manager`, and use `isOwner()` only where
+Gale-level ownership is required. The login screen shows visible local-test PINs.
 
 ---
 
-## 4. What to build — the Owner cockpit (v2 core)
+## 4. What to build — the Ops cockpit (v2 core)
 
-A new **`cockpit` tab**, visible to `owner|manager`, same dark-luxury skin, one scrollable
+A new **`cockpit` tab**, visible to `dev|owner|manager`, same dark-luxury skin, one scrollable
 phone screen with four sections:
 
 1. **Business numbers** — per property + portfolio totals: revenue, occupancy % (derived
    from booked nights in `turns`/feed over the month), cleaning cost/payouts, net. Month
    switcher. Manual add/edit writes to `financials`. Show a big portfolio number up top.
-2. **My tasks + schedule** — owner/manager to-do list from `owner_tasks`: title, optional
+2. **My tasks + schedule** — leadership to-do list from `owner_tasks`: title, optional
    property, due date, recurring (weekly/monthly), done toggle. A simple **today / this week**
    grouping. Overdue tasks also surface in Alerts.
 3. **Alerts + exceptions feed** — the "only what needs you" stream, **computed at read time**
    (no table): same-day turns today, any pool/hot tub reading that is `bad`/red, a turn not
    started/finished past its ready-by time, open `maintenance_tickets`, supplies at/under
-   `reorder_at`, overdue pool tests, overdue owner tasks. Sort by urgency. This is the
+   `reorder_at`, overdue pool tests, overdue ops tasks. Sort by urgency. This is the
    daily-glance answer to Gav's "I need to see it."
 4. **Goals tracker** — from `goals`: name, target, current, unit, deadline, progress bar.
-   E.g. monthly revenue target, keep review score ≥ 4.9, add a 5th property. Owner edits.
+   E.g. monthly revenue target, keep review score ≥ 4.9, add a 5th property. Leadership edits.
 
 ### Also locked in (build alongside the cockpit)
 - **Real turnover window** — show `checkout_time` / `checkin_time` on turn cards
   ("Clean by 11am · Guest 4pm") when the feed provides them; fall back to date-only.
-- **Live cleaner status** — a one-tap **"I'm on it"** (sets `started_at`) and **"Done"** on a
+- **Live worker status** — a one-tap **"I'm on it"** (sets `started_at`) and **"Done"** on a
   turn, with timestamps. Drives the board's live state and the Alerts feed (unstarted/late).
-- **Damage/issue report** — from a cleaner's phone: photo + note → opens a
-  `maintenance_ticket` and pushes the owner. Cleaners hit problems first; capture in the
+- **Damage/issue report** — from a worker's phone: photo + note → opens a
+  `maintenance_ticket` and pushes leadership. Workers hit problems first; capture in the
   moment.
 - **Pool compliance streak** — on the Water tab, a visible "N days logged · next due <date>"
   to make the habit stick and keep the insurance PDF airtight.
 
 ### Roadmap (build after the above, in this order)
-Cleaner hours + payouts (feeds Business numbers) → supplies auto-count + reorder list →
+Worker hours + payouts (feeds Business numbers) → supplies auto-count + reorder list →
 maintenance ticket list view → weather-smart pool care (free weather API; hot days raise
 cadence, freeze warnings for hot tubs) → review-to-turn link.
 
@@ -223,8 +220,8 @@ VEVENT when present.
 
 - **Server-side PIN check.** Never trust the client. Issue an httpOnly, Secure, SameSite
   session cookie signed with `SESSION_SECRET`; store in `sessions`; expire in ~30 days.
-- **Stronger PINs for elevated roles.** owner/manager use a **6-digit** PIN; cleaners may
-  keep 4. Lockout after 5 bad tries; rate-limit `/api/login`.
+- **Stronger PINs for elevated roles.** dev/owner/manager use a **6-digit** PIN; workers
+  may keep 4. Lockout after 5 bad tries; rate-limit `/api/login`.
 - **Cloudflare Access in front of the whole subdomain** (free, email one-time-code) so only
   the team's emails can even load the app. Belt-and-suspenders over PINs.
 - **Private photos.** R2 bucket stays private; serve only via short-lived signed URLs.
@@ -237,7 +234,7 @@ VEVENT when present.
 
 ## 7. iCal cutover (one step, when the URLs arrive)
 
-1. Anna/Gale export each listing's `.ics` (Availability → Export Calendar). 7 links total.
+1. Gale/Larry export each listing's `.ics` (Availability → Export Calendar). 7 links total.
    The copy-paste ask is drafted in vault `Projects/STR Website/iCal Setup - Ready for
    Tomorrow.md`.
 2. `wrangler secret put ICAL_WESTGATE_AIRBNB` (repeat for all seven).
@@ -250,10 +247,10 @@ VEVENT when present.
 
 1. **Worker CRUD API** (§5) + repoint `DB.*` in `data.js` to `fetch`. App runs off D1;
    localStorage is only an offline cache. Verify data survives with localStorage cleared.
-2. **Role migration** (§3) + `cockpit` tab shell gated to owner|manager.
+2. **Role migration** (§3) + `cockpit` tab shell gated to dev|owner|manager.
 3. **Cockpit modules** — Business numbers → Tasks/schedule → Alerts feed → Goals.
 4. **Auth hardening + Web Push + R2 photos** (§6).
-5. **Locked-in extras** — turnover window, live cleaner status, damage report, pool streak.
+5. **Locked-in extras** — turnover window, live worker status, damage report, pool streak.
 6. **Roadmap** features (§4) in the listed order.
 7. **iCal cutover** (§7) whenever Gav delivers the URLs — independent of everything else.
 
@@ -294,11 +291,11 @@ wrangler deploy
 ## 11. Verification (how you prove it's done)
 
 - **Backend swap:** clear localStorage, reload → all data still present (it's in D1).
-- **Roles:** log in as Gav (owner) and Anna (manager) → cockpit visible; as a cleaner →
-  cockpit hidden, only turns.
+- **Roles:** log in as Gav (Dev), Gale (Owner), and Larry (House Manager) → cockpit visible;
+  log in as Anna (Worker) → cockpit hidden, only turns.
 - **Cockpit:** seed a same-day turn + a red pool reading + an unstarted late turn + an open
   ticket → **all four appear in Alerts**. Add a financial row → portfolio total updates. Add
-  a goal → progress bar renders. Add an owner task due today → shows in today + alerts.
+  a goal → progress bar renders. Add an ops task due today → shows in today + alerts.
 - **Live status:** tap "I'm on it" → timestamp + board flips; leave a turn unstarted past
   ready-by → it surfaces in Alerts.
 - **Web Push:** subscribe on a real phone, trigger a due turn → a clean push fires.

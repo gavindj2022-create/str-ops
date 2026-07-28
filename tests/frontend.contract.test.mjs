@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const root=new URL('../',import.meta.url);
 const read=path=>readFile(new URL(path,root),'utf8');
 
-test('demo state uses canonical camelCase shape and three roles',async()=>{
+test('demo state uses canonical camelCase shape and corrected team roles',async()=>{
   const source=await read('public/data.js');
   const storage=new Map();
   const context=vm.createContext({
@@ -20,9 +20,11 @@ test('demo state uses canonical camelCase shape and three roles',async()=>{
   vm.runInContext(`${source}\nglobalThis.__demo={TEAM,DB,iso};`,context);
   const {TEAM,DB,iso}=context.__demo;
   const state=DB.load();
-  assert.deepEqual(Array.from(TEAM,item=>item.role),['owner','manager','cleaner','cleaner']);
+  assert.deepEqual(Array.from(TEAM,item=>item.role),['dev','owner','manager','cleaner']);
   assert.equal(TEAM.find(item=>item.id==='gav').pin.length,6);
-  assert.equal(TEAM.find(item=>item.id==='anna').pin.length,6);
+  assert.equal(TEAM.find(item=>item.id==='gale').role,'owner');
+  assert.equal(TEAM.find(item=>item.id==='larry').pin.length,6);
+  assert.equal(TEAM.find(item=>item.id==='anna').role,'cleaner');
   for(const key of ['turns','readings','financials','tasks','goals','alerts','tickets','supplies']){
     assert.ok(Array.isArray(state[key]),`${key} should be seeded`);
   }
@@ -81,7 +83,7 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   assert.match(app,/pinTarget\?\.pin\?\.length\|\|4/);
   assert.match(app,/startedAt:true/);
   assert.match(app,/Cloud sync failed/);
-  for(const phrase of ['I’m on it','Done · ready for guest','Report damage or issue','balanced-log streak','Owner cockpit']){
+  for(const phrase of ['I’m on it','Done · ready for guest','Report damage or issue','balanced-log streak','Ops cockpit','Test PIN']){
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
   assert.match(css,/@media \(max-width:390px\)/);

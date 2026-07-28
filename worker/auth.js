@@ -4,6 +4,7 @@ const COOKIE_NAME = 'str_ops_session';
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FAILURES = 5;
 const LOCK_MINUTES = 15;
+const ELEVATED_ROLES = ['dev', 'owner', 'manager'];
 
 function bytesToBase64Url(bytes) {
   let binary = '';
@@ -151,8 +152,8 @@ export async function login(request, env) {
       lockedUntil ? 'Too many failed attempts. Try again in 15 minutes.' : 'The PIN was not accepted.',
     );
   }
-  if ((user.role === 'owner' || user.role === 'manager') && pin.length < 6) {
-    return apiError(403, 'pin_upgrade_required', 'Owner and manager accounts require a 6-digit PIN.');
+  if (ELEVATED_ROLES.includes(user.role) && pin.length < 6) {
+    return apiError(403, 'pin_upgrade_required', 'Elevated accounts require a 6-digit PIN.');
   }
 
   await env.DB.prepare('DELETE FROM login_attempts WHERE attempt_key=?').bind(attemptKey).run();
@@ -199,8 +200,8 @@ export async function requireUser(request, env) {
 }
 
 export function requireManager(user) {
-  if (!['owner', 'manager'].includes(user.role)) {
-    throw new HttpError(403, 'forbidden', 'Manager access is required.');
+  if (!ELEVATED_ROLES.includes(user.role)) {
+    throw new HttpError(403, 'forbidden', 'Leadership access is required.');
   }
 }
 

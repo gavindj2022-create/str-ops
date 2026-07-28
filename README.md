@@ -6,13 +6,13 @@ Private, phone-first operations app for the four Short Term Retreats properties.
 
 The v2 local test build is runnable. It includes:
 
-- Owner, manager, and cleaner roles
-- Owner cockpit with revenue, net, expenses, cleaner payouts, alerts, tasks, and goals
-- Cleaner assignment and one-tap "I'm on it" status
+- Dev, owner, house manager, and worker roles
+- Ops cockpit with revenue, net, expenses, worker payouts, alerts, tasks, and goals
+- Worker assignment and one-tap "I'm on it" status
 - Turnover windows and same-day warnings
 - Checklist and required-photo ready gate
 - Authenticated R2 photo upload with deleted-photo invalidation
-- Cleaner damage/issue reporting
+- Worker damage/issue reporting
 - Pool and hot-tub logging, two-day cadence, streak, and compliance export
 - Unified Cloudflare Worker, D1 migrations, local seed data, authenticated API, R2 routes,
   scheduled iCal reconciliation, and role enforcement
@@ -35,10 +35,10 @@ Demo PINs:
 
 | Person | Role | PIN |
 |---|---|---|
-| Gav | Owner | `135790` |
-| Anna | Manager | `246810` |
-| Maria | Cleaner | `1111` |
-| Jess | Cleaner | `2222` |
+| Gav | Dev | `135790` |
+| Gale | Owner | `975310` |
+| Larry | House Manager | `246810` |
+| Anna | Worker | `1111` |
 
 `npm run test-version` applies local D1 migrations, refreshes the idempotent demo seed, and
 starts the Worker with a test-only session secret. The browser keeps a local fallback copy
@@ -53,7 +53,7 @@ npx wrangler deploy --dry-run
 
 - `npm test` runs nine backend unit and frontend contract tests.
 - `npm run test:backend` starts a separate local Worker and verifies authentication,
-  role redaction, CRUD, cleaner claim/start, positive and negative checklist/photo ready
+  role redaction, CRUD, worker claim/start, positive and negative checklist/photo ready
   gates, deleted-photo invalidation, water, and computed alerts.
 
 ## Local-test boundaries
@@ -81,7 +81,7 @@ npx wrangler deploy --dry-run
 2. Create/bind the production `str-ops-photos` R2 bucket.
 3. Set `SESSION_SECRET` with `wrangler secret put SESSION_SECRET`.
 4. Configure Cloudflare Access and the team email allowlist.
-5. Add the seven Airbnb/Vrbo iCal secrets from Anabelle or Gale.
+5. Add the seven Airbnb/Vrbo iCal secrets from Gale or Larry.
 6. Implement and verify VAPID Web Push delivery.
 7. Deploy with `npm run deploy`, attach `team.shorttermretreats.com`, and run real-phone
    authentication, camera, and acceptance testing.
