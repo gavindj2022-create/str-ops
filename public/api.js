@@ -44,6 +44,7 @@
 
   global.STRApi={
     request,
+    photoUrl:key=>`/api/photos/${String(key).split('/').map(encodeURIComponent).join('/')}`,
     loginOptions:()=>request('/api/login-options'),
     login:(userId,pin)=>request('/api/login',{method:'POST',body:{userId,pin}}),
     logout:()=>request('/api/logout',{method:'POST'}),

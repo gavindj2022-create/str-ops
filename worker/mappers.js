@@ -97,6 +97,7 @@ export function mapReading(row) {
     ph: row.ph,
     alk: row.alk,
     note: row.note,
+    photoKey: row.photo_key,
     loggedBy: row.logged_by,
   };
 }

@@ -24,8 +24,8 @@ VALUES
    'str-ops-demo-gale-v3', 120000, '#C9A46B', 1),
   ('larry', 'Larry', 'manager', 'SURJnMYJPBLwkQKD4LS1GMCtK9eJ0ISLs2Uyp2G-mP4',
    'str-ops-demo-larry-v3', 120000, '#4FB0C6', 1),
-  ('anna', 'Anna', 'cleaner', 'RLdDtiJ9mcN3d1MekVMVatjk4C3-L1V02bJuCF7M4X4',
-   'str-ops-demo-anna-v3', 120000, '#5BB98B', 1)
+  ('anna', 'Ana', 'owner', 'gjlbl87EOIMFT_o62DHD7s24Rp5hlGkKwYGcPLj522U',
+   'str-ops-demo-anna-v4', 120000, '#5BB98B', 1)
 ON CONFLICT(id) DO UPDATE SET
   name=excluded.name, role=excluded.role, pin_hash=excluded.pin_hash,
   pin_salt=excluded.pin_salt, pin_iterations=excluded.pin_iterations,
@@ -71,14 +71,14 @@ ON CONFLICT(id) DO UPDATE SET
   same_day=excluded.same_day, status=excluded.status, assigned_to=excluded.assigned_to,
   started_at=NULL, completed_at=NULL, source=excluded.source, updated_ts=excluded.updated_ts;
 
-INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, logged_by) VALUES
-  ('demo-reading-westgate-pool', 'westgate-pool', datetime('now', '-3 day'), 0.6, 7.1, 70, 'Treat and retest', 'anna'),
-  ('demo-reading-westgate-tub', 'westgate-tub', datetime('now', '-1 day'), 3.0, 7.4, 100, NULL, 'anna'),
-  ('demo-reading-hickory-pool', 'hickory-pool', datetime('now', '-1 day'), 2.2, 7.5, 95, NULL, 'anna'),
-  ('demo-reading-hickory-tub', 'hickory-tub', datetime('now', '-6 day'), 2.0, 7.3, 90, 'Overdue test demo', 'anna')
+INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, logged_by, photo_key) VALUES
+  ('demo-reading-westgate-pool', 'westgate-pool', datetime('now', '-3 day'), 0.6, 7.1, 70, 'Treat and retest', 'anna', NULL),
+  ('demo-reading-westgate-tub', 'westgate-tub', datetime('now', '-1 day'), 3.0, 7.4, 100, NULL, 'anna', NULL),
+  ('demo-reading-hickory-pool', 'hickory-pool', datetime('now', '-1 day'), 2.2, 7.5, 95, NULL, 'anna', NULL),
+  ('demo-reading-hickory-tub', 'hickory-tub', datetime('now', '-6 day'), 2.0, 7.3, 90, 'Overdue test demo', 'anna', NULL)
 ON CONFLICT(id) DO UPDATE SET
   ts=excluded.ts, chlorine=excluded.chlorine, ph=excluded.ph, alk=excluded.alk,
-  note=excluded.note, logged_by=excluded.logged_by;
+  note=excluded.note, logged_by=excluded.logged_by, photo_key=excluded.photo_key;
 
 INSERT INTO maintenance_tickets
   (id, property_id, opened_ts, opened_by, note, priority, status)
@@ -102,7 +102,7 @@ INSERT INTO owner_tasks
   (id, title, property_id, due_date, done, recurring, assigned_to, priority, notes, created_ts)
 VALUES
   ('demo-task-overdue', 'Replace Westgate patio string lights', 'westgate',
-   date('now', '-5 hours', '-1 day'), 0, NULL, 'larry', 'urgent', 'Coordinate after the next checkout', datetime('now')),
+   date('now', '-5 hours', '-1 day'), 0, NULL, 'anna', 'urgent', 'Coordinate after the next checkout', datetime('now')),
   ('demo-task-kayaks', 'Order Millpoint kayak life jackets', 'millpoint',
    date('now', '-5 hours', '+4 day'), 0, NULL, 'gav', 'normal', NULL, datetime('now'))
 ON CONFLICT(id) DO UPDATE SET

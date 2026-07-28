@@ -7,13 +7,13 @@ const STORE_KEY = 'strops.v2';
 
 const PROPERTIES = [
   { id:'millpoint', name:'Millpoint Waterfront', location:'East Peoria', beds:2, baths:2, sleeps:6,
-    hasPool:false, hasHotTub:false, water:'Lake • boat ramp • 2 kayaks • bonfire' },
+    emoji:'🚤', color:'#1F4E5F', hasPool:false, hasHotTub:false, water:'Lake • boat ramp • 2 kayaks • bonfire' },
   { id:'westgate', name:'Westgate Oasis', location:'Washington, IL', beds:4, baths:2, sleeps:12,
-    hasPool:true, hasHotTub:true, water:'Heated 18×36 pool • year-round hot tub' },
+    emoji:'🏝️', color:'#6B4F8A', hasPool:true, hasHotTub:true, water:'Heated 18×36 pool • year-round hot tub' },
   { id:'galena', name:'Galena Shores', location:'Peoria Heights', beds:2, baths:2, sleeps:6,
-    hasPool:false, hasHotTub:false, water:'Private beach • 2 kayaks • arcade' },
+    emoji:'🏖️', color:'#8A6B4F', hasPool:false, hasHotTub:false, water:'Private beach • 2 kayaks • arcade' },
   { id:'hickory', name:'Hickory Hideaway', location:'East Peoria', beds:3, baths:2.5, sleeps:10,
-    hasPool:true, hasHotTub:true, water:'Heated pool • cabana hot tub • multi-level' },
+    emoji:'🌲', color:'#2E6E82', hasPool:true, hasHotTub:true, water:'Heated pool • cabana hot tub • multi-level' },
 ];
 
 const WATER_ASSETS = [
@@ -66,10 +66,10 @@ const CHECKLISTS = {
 };
 
 const TEAM = [
-  { id:'gav',   name:'Gav',   role:'dev',     title:'Dev',           pin:'135790', color:'#E0A94B' },
-  { id:'gale',  name:'Gale',  role:'owner',   title:'Owner',         pin:'975310', color:'#C9A46B' },
-  { id:'larry', name:'Larry', role:'manager', title:'House Manager', pin:'246810', color:'#4FB0C6' },
-  { id:'anna',  name:'Anna',  role:'cleaner', title:'Worker',        pin:'1111',   color:'#5BB98B' },
+  { id:'gav',   name:'Gav',   role:'dev',     title:'Dev + Crew',        pin:'135790', color:'#E0A94B', canWork:true },
+  { id:'gale',  name:'Gale',  role:'owner',   title:'Owner',             pin:'975310', color:'#C9A46B', canWork:false },
+  { id:'larry', name:'Larry', role:'manager', title:'House Manager',     pin:'246810', color:'#4FB0C6', canWork:true },
+  { id:'anna',  name:'Ana',   role:'owner',   title:'Owner + Organizer', pin:'864210', color:'#5BB98B', canWork:true },
 ];
 
 /* ---- date helpers ---- */
@@ -92,10 +92,10 @@ function seedTurns(){
 }
 function seedReadings(){
   return [
-    { id:'r1', assetId:'westgate-pool', ts:addDays(-3)+'T09:00', chlorine:0.6, ph:7.1, alk:70 }, // low -> needs attention
-    { id:'r2', assetId:'westgate-tub',  ts:addDays(-1)+'T09:00', chlorine:3.0, ph:7.4, alk:100 },
-    { id:'r3', assetId:'hickory-pool',  ts:addDays(-1)+'T10:00', chlorine:2.2, ph:7.5, alk:95 },
-    { id:'r4', assetId:'hickory-tub',   ts:addDays(-6)+'T10:00', chlorine:2.0, ph:7.3, alk:90 }, // stale -> test due
+    { id:'r1', assetId:'westgate-pool', ts:addDays(-3)+'T09:00', chlorine:0.6, ph:7.1, alk:70, photoKey:null }, // low -> needs attention
+    { id:'r2', assetId:'westgate-tub',  ts:addDays(-1)+'T09:00', chlorine:3.0, ph:7.4, alk:100, photoKey:null },
+    { id:'r3', assetId:'hickory-pool',  ts:addDays(-1)+'T10:00', chlorine:2.2, ph:7.5, alk:95, photoKey:null },
+    { id:'r4', assetId:'hickory-tub',   ts:addDays(-6)+'T10:00', chlorine:2.0, ph:7.3, alk:90, photoKey:null }, // stale -> test due
   ];
 }
 
@@ -109,7 +109,7 @@ function seedFinancials(){
 }
 function seedTasks(){
   return [
-    { id:'task1', title:'Replace Westgate patio string lights', propertyId:'westgate', assigneeId:'larry', priority:'high', dueDate:addDays(1), status:'open' },
+    { id:'task1', title:'Replace Westgate patio string lights', propertyId:'westgate', assigneeId:'anna', priority:'high', dueDate:addDays(1), status:'open' },
     { id:'task2', title:'Order Millpoint kayak life jackets', propertyId:'millpoint', assigneeId:'gav', priority:'normal', dueDate:addDays(4), status:'open' },
     { id:'task3', title:'Confirm Hickory HVAC service', propertyId:'hickory', assigneeId:'larry', priority:'high', dueDate:addDays(-1), status:'open' },
   ];

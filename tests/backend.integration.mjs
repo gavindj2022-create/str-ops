@@ -63,6 +63,13 @@ runWrangler([
   'execute',
   'str-ops',
   '--local',
+  '--command=INSERT INTO team (id, name, role, pin_hash, pin_salt, pin_iterations, color, active) VALUES (\'test-worker\', \'Test Worker\', \'cleaner\', \'FpZQQcVgJOG-EXMgmLRQeUfA9G3N0nUNpQw4ZbOCO7g\', \'str-ops-integration-worker\', 120000, \'#7AA2F7\', 1) ON CONFLICT(id) DO UPDATE SET active=1, role=\'cleaner\', pin_hash=excluded.pin_hash, pin_salt=excluded.pin_salt',
+]);
+runWrangler([
+  'd1',
+  'execute',
+  'str-ops',
+  '--local',
   '--command=DELETE FROM turn_checks WHERE turn_id IN (\'demo-turn-hickory\', \'demo-turn-westgate\')',
 ]);
 
@@ -83,6 +90,7 @@ const child = spawn(process.execPath, [
 let logs = '';
 child.stdout.on('data', chunk => { logs += chunk; });
 child.stderr.on('data', chunk => { logs += chunk; });
+let photoWaterReadingId = null;
 
 try {
   await waitForServer(child);
@@ -97,7 +105,8 @@ try {
   assert.ok(options.payload.users.some(user => user.id === 'gav' && user.role === 'dev'));
   assert.ok(options.payload.users.some(user => user.id === 'gale' && user.role === 'owner'));
   assert.ok(options.payload.users.some(user => user.id === 'larry' && user.role === 'manager'));
-  assert.ok(options.payload.users.some(user => user.id === 'anna' && user.role === 'cleaner'));
+  assert.ok(options.payload.users.some(user => user.id === 'anna' && user.role === 'owner'));
+  assert.ok(options.payload.users.some(user => user.id === 'test-worker' && user.role === 'cleaner'));
   assert.equal(options.payload.users.some(user => ['maria', 'jess'].includes(user.id)), false);
   assert.equal(JSON.stringify(options.payload).toLowerCase().includes('pin'), false);
 
@@ -175,7 +184,7 @@ try {
 
   const cleanerLogin = await api('/api/login', {
     method: 'POST',
-    body: { teamId: 'anna', pin: '1111' },
+    body: { teamId: 'test-worker', pin: '3333' },
   });
   assert.equal(cleanerLogin.response.status, 200);
   const cleanerCookie = cookieFrom(cleanerLogin.response);
@@ -200,7 +209,7 @@ try {
   const legacyBrokenClaim = await api('/api/turns/demo-turn-hickory', {
     method: 'PATCH',
     cookie: cleanerCookie,
-    body: { assigned: 'anna', status: 'in_progress' },
+    body: { assigned: 'test-worker', status: 'in_progress' },
   });
   assert.equal(legacyBrokenClaim.response.status, 403);
 
@@ -210,8 +219,26 @@ try {
     body: { status: 'in_progress', startedAt: true },
   });
   assert.equal(cleanerClaim.response.status, 200);
-  assert.equal(cleanerClaim.payload.assigned, 'anna');
+  assert.equal(cleanerClaim.payload.assigned, 'test-worker');
   assert.ok(cleanerClaim.payload.startedAt);
+
+  const plainCheck = await api('/api/turns/demo-turn-hickory/checks/0', {
+    method: 'PUT',
+    cookie: cleanerCookie,
+    body: { checked: true },
+  });
+  assert.equal(plainCheck.response.status, 200);
+  assert.equal(plainCheck.payload.done, true);
+  assert.equal(plainCheck.payload.photoKey, null);
+
+  const plainUncheck = await api('/api/turns/demo-turn-hickory/checks/0', {
+    method: 'PUT',
+    cookie: cleanerCookie,
+    body: { checked: false },
+  });
+  assert.equal(plainUncheck.response.status, 200);
+  assert.equal(plainUncheck.payload.done, false);
+  assert.equal(plainUncheck.payload.photoKey, null);
 
   const prematureDone = await api('/api/turns/demo-turn-hickory', {
     method: 'PATCH',
@@ -237,6 +264,15 @@ try {
   });
   assert.equal(uploadedPhoto.response.status, 201);
   assert.match(uploadedPhoto.payload.key, /^private\//);
+
+  const photoWaterReading = await api('/api/water', {
+    method: 'POST',
+    cookie: cleanerCookie,
+    body: { assetId: 'hickory-pool', chlorine: 2.4, ph: 7.4, alk: 95, note: 'Photo test log', photoKey: uploadedPhoto.payload.key },
+  });
+  assert.equal(photoWaterReading.response.status, 201);
+  assert.equal(photoWaterReading.payload.photoKey, uploadedPhoto.payload.key);
+  photoWaterReadingId = photoWaterReading.payload.id;
 
   const verifiedCheck = await api('/api/turns/demo-turn-hickory/checks/0', {
     method: 'PUT',
@@ -286,6 +322,7 @@ try {
 
   await api(`/api/tasks/${taskId}`, { method: 'DELETE', cookie: managerCookie });
   await api(`/api/water/${reading.payload.id}`, { method: 'DELETE', cookie: managerCookie });
+  if (photoWaterReadingId) await api(`/api/water/${photoWaterReadingId}`, { method: 'DELETE', cookie: managerCookie });
   await api('/api/turns/demo-turn-westgate', {
     method: 'PATCH',
     cookie: managerCookie,
@@ -311,6 +348,6 @@ try {
     'execute',
     'str-ops',
     '--local',
-    '--command=DELETE FROM turn_checks WHERE turn_id=\'demo-turn-hickory\'; UPDATE turns SET status=\'needs_cleaning\', assigned_to=NULL, started_at=NULL, completed_at=NULL WHERE id=\'demo-turn-hickory\'',
+    '--command=DELETE FROM turn_checks WHERE turn_id=\'demo-turn-hickory\'; UPDATE turns SET status=\'needs_cleaning\', assigned_to=NULL, started_at=NULL, completed_at=NULL WHERE id=\'demo-turn-hickory\'; DELETE FROM team WHERE id=\'test-worker\'',
   ]);
 }

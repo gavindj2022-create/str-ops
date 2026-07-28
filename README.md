@@ -8,12 +8,14 @@ The v2 local test build is runnable. It includes:
 
 - Dev, owner, house manager, and worker roles
 - Ops cockpit with revenue, net, expenses, worker payouts, alerts, tasks, and goals
-- Worker assignment and one-tap "I'm on it" status
+- Ana owner-organizer tools for auto-assigning open turns and copying a daily crew brief
+- Team assignment and one-tap "Claim + Start" status
 - Turnover windows and same-day warnings
-- Checklist and required-photo ready gate
+- Checklist items that can be checked and unchecked, plus a required-photo ready gate
 - Authenticated R2 photo upload with deleted-photo invalidation
 - Worker damage/issue reporting
-- Pool and hot-tub logging, two-day cadence, streak, and compliance export
+- Pool and hot-tub logging, Photo Test Log kit-photo attachment, two-day cadence,
+  safe-water streak, simple care hints, and compliance export
 - Unified Cloudflare Worker, D1 migrations, local seed data, authenticated API, R2 routes,
   scheduled iCal reconciliation, and role enforcement
 
@@ -38,7 +40,7 @@ Fallback demo PINs:
 | Gav | Dev | `135790` |
 | Gale | Owner | `975310` |
 | Larry | House Manager | `246810` |
-| Anna | Worker | `1111` |
+| Ana | Owner + Organizer | `864210` |
 
 `npm run test-version` applies local D1 migrations, refreshes the idempotent demo seed, and
 starts the Worker with a test-only session secret. The browser keeps a local fallback copy
@@ -51,10 +53,10 @@ npm run test:all
 npx wrangler deploy --dry-run
 ```
 
-- `npm test` runs nine backend unit and frontend contract tests.
+- `npm test` runs backend unit and frontend contract tests.
 - `npm run test:backend` starts a separate local Worker and verifies authentication,
-  role redaction, CRUD, worker claim/start, positive and negative checklist/photo ready
-  gates, deleted-photo invalidation, water, and computed alerts.
+  role redaction, CRUD, team claim/start, positive and negative checklist/photo ready
+  gates, deleted-photo invalidation, water photo logs, and computed alerts.
 
 ## Local-test boundaries
 

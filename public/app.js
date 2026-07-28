@@ -4,6 +4,7 @@ let USER=null;
 let VIEW='today';
 let S=DB.load();
 let API_CONNECTED=false;
+let WATER_DRAFTS={};
 
 const API=window.STRApi;
 const $=(selector,root=document)=>root.querySelector(selector);
@@ -15,6 +16,10 @@ const isLeaderRole=role=>['dev','owner','manager'].includes(normalizeRole(role))
 const isLeader=()=>USER&&isLeaderRole(USER.role);
 const roleLabel=role=>({dev:'Dev',owner:'Owner',manager:'House Manager',cleaner:'Worker',admin:'House Manager'}[role]||'Team');
 const displayRole=person=>person?.title||roleLabel(normalizeRole(person?.role));
+const propertyColor=id=>prop(id).color||HEAD_TINT[id]||'#2E6E82';
+const propertyEmoji=id=>prop(id).emoji||'🏠';
+const assignableWorkers=()=>TEAM.filter(person=>person.canWork!==false&&person.id!=='gale');
+const photoSrc=key=>key&&(API.photoUrl?API.photoUrl(key):`/api/photos/${String(key).split('/').map(encodeURIComponent).join('/')}`);
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const HEAD_TINT={millpoint:'#1F4E5F',westgate:'#6b4f8a',galena:'#8a6b4f',hickory:'#2E6E82'};
 
@@ -227,15 +232,15 @@ function renderToday(){
   const available=toClean.filter(turn=>!turn.assigned);
   const list=isLeader()?toClean:[...mine,...available];
   let html=`<div class="stat-row">
-    <div class="stat clean"><div class="n">${toClean.length}</div><div class="l">to clean</div></div>
-    <div class="stat arrive"><div class="n">${arriving.length}</div><div class="l">arriving</div></div>
-    <div class="stat pool"><div class="n">${testsDue.length}</div><div class="l">water tests</div></div>
+    <div class="stat clean"><div class="n">${toClean.length}</div><div class="l">Clean today</div></div>
+    <div class="stat arrive"><div class="n">${arriving.length}</div><div class="l">Guests today</div></div>
+    <div class="stat pool"><div class="n">${testsDue.length}</div><div class="l">Water checks</div></div>
   </div>`;
   if(isLeader()){
     const urgent=S.alerts.filter(alert=>!alert.resolved&&alert.severity==='urgent').length;
     html+=`<button class="brief-banner" data-open-cockpit>
       <span><b>${urgent} urgent signal${urgent===1?'':'s'}</b><small>${S.tasks.filter(task=>task.status!=='done').length} open tasks · ${S.tickets.filter(ticket=>ticket.status==='open').length} open ticket</small></span>
-      <span>View cockpit →</span>
+      <span>Open cockpit</span>
     </button>`;
   }
   html+=`<p class="sec-label">${isLeader()?'Turnovers today':'Your work today'}</p>`;
@@ -244,7 +249,7 @@ function renderToday(){
     html+=`<p class="sec-label">Water needs you</p>`;
     html+=testsDue.map(asset=>`<div class="wa compact" data-water="${asset.id}">
       <div class="wa-foot"><div><div class="wa-name">${esc(asset.name)}</div>
-      <div class="wa-prop">${esc(prop(asset.propertyId).name)} · test due</div></div>
+      <div class="wa-prop">${propertyEmoji(asset.propertyId)} ${esc(prop(asset.propertyId).name)} · test due</div></div>
       <button class="assign-chip" data-water="${asset.id}">Log now</button></div></div>`).join('');
   }
   return html;
@@ -269,12 +274,12 @@ function turnCard(turn){
   const canWork=turn.status!=='done'&&(!turn.assigned||turn.assigned===USER.id||isLeader());
   const action=canWork?`
     <div class="quick-actions">
-      ${turn.status==='needs_cleaning'?`<button data-claim="${turn.id}">${turn.assigned?'I’m on it':'Claim · I’m on it'}</button>`:''}
+      ${turn.status==='needs_cleaning'?`<button data-claim="${turn.id}">${turn.assigned?'Start work':'Claim + Start'}</button>`:''}
       <button class="quick-done" data-quickdone="${turn.id}">Done</button>
     </div>`:'';
   return `<article class="card ${sameDay&&turn.status!=='done'?'urgent':''}" data-turn="${turn.id}">
-    <div class="card-head" style="background-color:${HEAD_TINT[turn.propertyId]||'#2E6E82'}">
-      <span class="ch-name">${esc(property.name)}</span><span class="ch-loc">${esc(property.location)}</span>
+    <div class="card-head" style="background-color:${propertyColor(turn.propertyId)}">
+      <span class="home-badge">${propertyEmoji(turn.propertyId)}</span><span class="ch-name">${esc(property.name)}</span><span class="ch-loc">${esc(property.location)}</span>
     </div>
     <div class="card-body">
       <div class="card-copy"><span class="pill ${pill}">${pillText}</span>
@@ -295,16 +300,17 @@ function openTurn(id){
   const photos=turnPhotos(turn);
   const groups=[...new Set(list.map(item=>item.group))];
   let body=`<div class="sheet-grab"></div><div class="sheet-title">${esc(property.name)}</div>
-    <div class="sheet-sub">Cleaning window ${fmtTime(turn.checkoutTime)}–${fmtTime(turn.readyBy)}${turn.checkin?` · guest in ${fmtDay(turn.checkin)} at ${fmtTime(turn.checkinTime)}`:''}</div>
+    <div class="sheet-sub">${propertyEmoji(turn.propertyId)} Cleaning window ${fmtTime(turn.checkoutTime)}–${fmtTime(turn.readyBy)}${turn.checkin?` · guest in ${fmtDay(turn.checkin)} at ${fmtTime(turn.checkinTime)}`:''}</div>
+    <div class="plain-note"><b>Claim + Start</b> means this turn becomes yours, the status changes to In progress, and Ana can see you started.</div>
     <div class="sheet-action-row">
-      ${!turn.assigned&&turn.status!=='done'?`<button class="btn primary" data-claim="${turn.id}">I’m on it</button>`:''}
+      ${!turn.assigned&&turn.status!=='done'?`<button class="btn primary" data-claim="${turn.id}">Claim + Start</button>`:''}
       <button class="btn ghost" data-report="${turn.id}">Report issue</button>
     </div>`;
   if(isLeader()){
     const assigned=member(turn.assigned);
     const who=assigned?.name||(turn.assigned?'Assigned team member':'Unassigned');
     body+=`<div class="row"><span class="pa" style="background:${assigned?.color||'#2b2b30'}">${esc(who[0]||'?')}</span>
-      <div><div class="rn">${esc(who)}</div><div class="rr">Assigned worker</div></div>
+      <div><div class="rn">${esc(who)}</div><div class="rr">Assigned team member</div></div>
       <button class="assign-chip" data-assign="${turn.id}">${turn.assigned?'Reassign':'Assign'}</button></div>`;
   }
   groups.forEach(group=>{
@@ -315,7 +321,7 @@ function openTurn(id){
       const hasPhoto=Boolean(photos[index]);
       const camera=item.photo?`<button class="cam ${hasPhoto?'has':item.photo==='required'?'req':''}" data-photo="${turn.id}:${index}" aria-label="Add photo">${hasPhoto?'&#10003;':'&#128247;'}</button>`:'';
       body+=`<div class="chk ${on?'on':''}" data-check="${turn.id}:${index}">
-        <span class="box">&#10003;</span><span class="lbl">${esc(item.label)}</span>${camera}</div>`;
+        <span class="box">&#10003;</span><span class="lbl"><span class="chk-text">${esc(item.label)}</span><small>${on?'Tap again to undo':'Tap when finished'}</small></span>${camera}</div>`;
     });
   });
   const gate=readyGate(turn);
@@ -408,6 +414,49 @@ function reopen(id){
   go(VIEW);
   toast('Turn re-opened');
 }
+async function toggleCheck(id,index){
+  const turn=S.turns.find(item=>item.id===id);
+  if(!turn) return;
+  if(!isLeader()&&turn.assigned!==USER.id){
+    toast('Claim this turn before updating its checklist');
+    return;
+  }
+  const previous={
+    checked:Boolean((S.checks[id]||{})[index]),
+    status:turn.status,
+    completedAt:turn.completedAt,
+  };
+  const checked=!previous.checked;
+  S.checks[id]=S.checks[id]||{};
+  S.checks[id][index]=checked;
+  if(checked&&turn.status==='needs_cleaning') turn.status='in_progress';
+  if(!checked&&['ready','done'].includes(turn.status)){
+    turn.status='in_progress';
+    turn.completedAt=null;
+  }
+  saveLocal();
+  openTurn(id);
+  toast(checked?'Item checked':'Item unchecked');
+  try{
+    await API.putCheck(id,Number(index),checked);
+    if(turn.status!==previous.status||turn.completedAt!==previous.completedAt){
+      await API.patchTurn(id,{status:turn.status,completedAt:turn.completedAt});
+    }
+    API_CONNECTED=true;
+  }catch(error){
+    API_CONNECTED=false;
+    if(error?.status){
+      S.checks[id][index]=previous.checked;
+      turn.status=previous.status;
+      turn.completedAt=previous.completedAt;
+      saveLocal();
+      openTurn(id);
+      toast(`Checklist change failed: ${error.message}`);
+    }else{
+      toast('Saved on this phone; cloud sync is offline.');
+    }
+  }
+}
 
 /* ---------------- Issue report ---------------- */
 function openIssue(turnId){
@@ -470,8 +519,9 @@ function complianceStreak(){
 }
 function renderWater(){
   const current=WATER_ASSETS.filter(asset=>!testDue(asset).due&&readingStatus(asset.type,latestReading(asset.id)||{})==='good').length;
-  let html=`<div class="streak-card"><span class="streak-icon">&#10022;</span><div><b>${complianceStreak()} balanced-log streak</b>
+  let html=`<div class="streak-card"><span class="streak-icon">&#10022;</span><div><b>${complianceStreak()} safe water streak</b>
     <small>${current} of ${WATER_ASSETS.length} water assets current · tests every 2 days</small></div></div>
+    <div class="scan-card"><span class="streak-icon">&#128247;</span><div><b>Photo Test Log</b><small>Take a kit photo, type the 3 numbers, and STR Ops keeps the reading plus the photo.</small></div></div>
     <p class="sec-label">Pools &amp; hot tubs</p>`;
   html+=WATER_ASSETS.map(asset=>{
     const property=prop(asset.propertyId);
@@ -484,9 +534,13 @@ function renderWater(){
       ph:cellClass(asset.type,'ph',reading.ph),
       alk:cellClass(asset.type,'alk',reading.alk),
     }:{chlorine:'bad',ph:'bad',alk:'bad'};
+    const thumb=reading?.photoKey?`<img class="water-thumb" src="${esc(photoSrc(reading.photoKey))}" alt="Pool kit photo">`:'';
+    const photoBadge=reading?.photoKey?'<span class="photo-badge">Kit photo saved</span>':'';
     return `<div class="wa" data-water="${asset.id}">
-      <div class="wa-top"><div><div class="wa-name">${esc(asset.name)}</div><div class="wa-prop">${esc(property.name)}</div></div>
+      <div class="wa-top"><div><div class="wa-name">${propertyEmoji(asset.propertyId)} ${esc(asset.name)}</div><div class="wa-prop">${esc(property.name)}</div></div>
         <span class="pill ${status==='good'?'ready':status==='warn'?'needs':'sameday'}">${status==='good'?'Balanced':status==='warn'?'Adjust':'Needs care'}</span></div>
+      ${thumb}
+      ${photoBadge}
       <div class="wa-readout">
         <div class="wa-r ${cells.chlorine}"><div class="v">${reading?.chlorine??'-'}</div><div class="k">Chlorine</div></div>
         <div class="wa-r ${cells.ph}"><div class="v">${reading?.ph??'-'}</div><div class="k">pH</div></div>
@@ -494,7 +548,7 @@ function renderWater(){
       </div>
       <div class="dose ${tips.length?'':'ok'}">${tips.length?esc(tips.join(' · ')):'All balanced, no action needed'}</div>
       <div class="wa-foot"><span class="wa-due ${due.due?'over':''}">${reading?`Last tested ${due.days===0?'today':`${due.days}d ago`}`:'Never tested'}${due.due?' · due now':''}</span>
-        <button class="btn primary small-btn" data-log="${asset.id}">Log reading</button></div></div>`;
+        <div class="water-actions"><button class="btn ghost small-btn" data-waterphoto="${asset.id}">Photo test</button><button class="btn primary small-btn" data-log="${asset.id}">Log numbers</button></div></div></div>`;
   }).join('');
   html+=`<button class="btn ghost" data-compliance>&#128196; Export compliance log</button>`;
   return html;
@@ -504,39 +558,83 @@ function cellClass(type,key,value){
   if(value<target[0]||value>target[1]) return key==='chlorine'?'bad':'warn';
   return 'good';
 }
+function targetRange(asset,key){
+  const range=TARGETS[asset.type][key];
+  return `${range[0]}-${range[1]}`;
+}
 function openLog(assetId){
   const asset=WATER_ASSETS.find(item=>item.id===assetId);
   if(!asset) return;
-  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Log reading</div>
-    <div class="sheet-sub">${esc(asset.name)} · ${esc(prop(asset.propertyId).name)}</div>
+  const draft=WATER_DRAFTS[assetId]||{};
+  const preview=draft.previewUrl||draft.url||'';
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Water test</div>
+    <div class="sheet-sub">${propertyEmoji(asset.propertyId)} ${esc(asset.name)} · ${esc(prop(asset.propertyId).name)}</div>
+    <div class="plain-note"><b>Photo Test Log</b> keeps the kit photo with this reading. It does not guess from color yet, so type the numbers you see before saving.</div>
+    <button class="btn ghost" data-waterphoto="${asset.id}">&#128247; ${draft.photoKey?'Replace kit photo':'Attach kit photo'}</button>
+    ${preview?`<img class="kit-preview" src="${esc(preview)}" alt="Kit photo preview">`:''}
+    ${draft.photoKey?`<div class="photo-badge wide">${draft.synced===false?'Local photo attached':'Kit photo attached'}</div>`:''}
     <div class="reading-grid">
-      <div class="field"><label>Chlorine <span class="unit">ppm</span></label><input id="in-cl" type="number" step="0.1" inputmode="decimal" placeholder="1–3"></div>
-      <div class="field"><label>pH</label><input id="in-ph" type="number" step="0.1" inputmode="decimal" placeholder="7.2–7.6"></div>
-      <div class="field"><label>Alk <span class="unit">ppm</span></label><input id="in-alk" type="number" step="1" inputmode="numeric" placeholder="80–120"></div>
+      <div class="field"><label>Chlorine <span class="unit">ppm</span></label><input id="in-cl" type="number" step="0.1" inputmode="decimal" placeholder="${targetRange(asset,'chlorine')}"><small class="target">Target ${targetRange(asset,'chlorine')}</small></div>
+      <div class="field"><label>pH</label><input id="in-ph" type="number" step="0.1" inputmode="decimal" placeholder="${targetRange(asset,'ph')}"><small class="target">Target ${targetRange(asset,'ph')}</small></div>
+      <div class="field"><label>Alkalinity <span class="unit">ppm</span></label><input id="in-alk" type="number" step="1" inputmode="numeric" placeholder="${targetRange(asset,'alk')}"><small class="target">Target ${targetRange(asset,'alk')}</small></div>
     </div>
-    <div class="field"><label>Note (optional)</label><input id="in-note" maxlength="160" placeholder="e.g. added 2 tabs"></div>
+    <div class="field"><label>What did you add? (optional)</label><input id="in-note" maxlength="160" placeholder="Example: added 2 tabs"></div>
     <button class="btn primary" data-savelog="${asset.id}">Save reading</button>`);
 }
 function saveLog(assetId){
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
   const chlorine=parseFloat($('#in-cl').value);
   const ph=parseFloat($('#in-ph').value);
   const alk=parseFloat($('#in-alk').value);
   if([chlorine,ph,alk].some(Number.isNaN)){ toast('Fill chlorine, pH, and alkalinity'); return; }
+  const draft=WATER_DRAFTS[assetId]||{};
   const reading={
     id:`reading-${Date.now()}`,assetId,ts:new Date().toISOString(),chlorine,ph,alk,
-    note:$('#in-note').value.trim(),recordedBy:USER.id,
+    note:$('#in-note').value.trim(),recordedBy:USER.id,photoKey:draft.photoKey||null,photoLocal:draft.synced===false,
   };
-  commit(()=>S.readings.push(reading),()=>API.logWater(reading),{render:false});
+  const remoteReading={...reading};
+  if(draft.synced===false) delete remoteReading.photoKey;
+  commit(()=>S.readings.push(reading),()=>API.logWater(remoteReading),{render:false});
+  delete WATER_DRAFTS[assetId];
   closeSheet();
   go('water');
-  toast('Reading saved');
+  const tips=doseAdvice(asset.type,reading);
+  toast(tips.length?'Reading saved with care note':'Reading saved and balanced');
+}
+function captureWaterPhoto(assetId){
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.capture='environment';
+  input.onchange=async()=>{
+    const file=input.files[0];
+    if(!file) return;
+    const previewUrl=URL.createObjectURL(file);
+    toast('Uploading kit photo...');
+    try{
+      const uploaded=await API.uploadPhoto(file);
+      API_CONNECTED=true;
+      WATER_DRAFTS[assetId]={photoKey:uploaded.key,synced:true,url:uploaded.url||photoSrc(uploaded.key),previewUrl};
+      openLog(assetId);
+      toast('Kit photo attached. Confirm the numbers.');
+    }catch(error){
+      API_CONNECTED=false;
+      WATER_DRAFTS[assetId]={photoKey:`local-water-${Date.now()}`,synced:false,previewUrl};
+      openLog(assetId);
+      toast('Photo attached for this phone only. Confirm the numbers.');
+    }
+  };
+  input.click();
 }
 function exportCompliance(){
   const rows=[...S.readings].sort((a,b)=>b.ts.localeCompare(a.ts)).map(reading=>{
     const asset=WATER_ASSETS.find(item=>item.id===reading.assetId);
     const property=prop(asset?.propertyId);
     const when=new Date(reading.ts).toLocaleString('en-US',{timeZone:'America/Chicago'});
-    return `<tr><td>${esc(when)}</td><td>${esc(property.name)}</td><td>${esc(asset?.name||'')}</td><td>${reading.chlorine}</td><td>${reading.ph}</td><td>${reading.alk}</td><td>${esc(reading.note||'')}</td></tr>`;
+    return `<tr><td>${esc(when)}</td><td>${esc(property.name)}</td><td>${esc(asset?.name||'')}</td><td>${reading.chlorine}</td><td>${reading.ph}</td><td>${reading.alk}</td><td>${reading.photoKey?'Yes':'No'}</td><td>${esc(reading.note||'')}</td></tr>`;
   }).join('');
   const printWindow=window.open('','_blank');
   if(!printWindow){ toast('Allow pop-ups to export'); return; }
@@ -545,7 +643,7 @@ function exportCompliance(){
     table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #ccc;padding:7px;text-align:left}th{background:#f2efe9}
     </style></head><body><h1>Short Term Retreats | Water Compliance Log</h1>
     <div class="sub">America/Chicago · generated ${esc(new Date().toLocaleString('en-US',{timeZone:'America/Chicago'}))}</div>
-    <table><thead><tr><th>Date/time</th><th>Property</th><th>Asset</th><th>Cl</th><th>pH</th><th>Alk</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    <table><thead><tr><th>Date/time</th><th>Property</th><th>Asset</th><th>Cl</th><th>pH</th><th>Alk</th><th>Photo</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
   printWindow.document.close();
   setTimeout(()=>printWindow.print(),300);
 }
@@ -567,13 +665,17 @@ function renderCockpit(){
   const net=totals.revenue-totals.expenses-totals.payouts;
   const openAlerts=S.alerts.filter(alert=>!alert.resolved);
   const openTasks=S.tasks.filter(task=>task.status!=='done');
-  let html=`<div class="cockpit-head"><div><span class="eyebrow">Ops cockpit</span><h1>The business, at a glance.</h1></div>
+  let html=`<div class="cockpit-head"><div><span class="eyebrow">Ops cockpit</span><h1>Today at a glance.</h1></div>
     <span class="live-dot ${API_CONNECTED?'online':''}">${API_CONNECTED?'Live':'Demo'}</span></div>
+    <div class="organizer-card">
+      <div><b>Ana's organizer tools</b><small>Assign open turns, copy the day brief, then send it to the crew.</small></div>
+      <div class="organizer-actions"><button class="btn ghost small-btn" data-autoassign>Auto-assign</button><button class="btn primary small-btn" data-copybrief>Copy brief</button></div>
+    </div>
     <div class="money-grid">
       <div class="money-card hero"><small>Revenue</small><b>${money(totals.revenue)}</b><span>this month</span></div>
       <div class="money-card"><small>Net operating</small><b>${money(net)}</b><span>after costs + payouts</span></div>
       <div class="money-card"><small>Property costs</small><b>${money(totals.expenses)}</b><span>recorded expenses</span></div>
-      <div class="money-card"><small>Worker pay</small><b>${money(totals.payouts)}</b><span>projected payouts</span></div>
+      <div class="money-card"><small>Crew pay</small><b>${money(totals.payouts)}</b><span>projected payouts</span></div>
     </div>
     <div class="section-heading"><p class="sec-label">Needs attention</p><span>${openAlerts.length} open</span></div>
     <div class="alert-stack">${openAlerts.map(alertCard).join('')}</div>
@@ -668,13 +770,15 @@ function saveFinancial(){
 
 /* ---------------- Team and assignment ---------------- */
 function renderTeam(){
-  let html=`<p class="sec-label">The team</p>`;
+  let html=`<p class="sec-label">Team &amp; roles</p>
+    <div class="plain-note"><b>Ana and Gale are owners.</b> Ana can organize the day, assign turns, and copy a simple brief to send out.</div>`;
   html+=TEAM.map(person=>`<div class="row"><span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
-    <div><div class="rn">${esc(person.name)}</div><div class="rr">${esc(displayRole(person))}${person.role==='dev'?' - app build + test access':person.role==='owner'?' - business owner':person.role==='manager'?' - house operations':''}</div></div>
+    <div><div class="rn">${esc(person.name)}</div><div class="rr">${esc(displayRole(person))}${person.id==='anna'?' - assigns, organizes, and sends the day':person.role==='dev'?' - app build + crew':person.role==='owner'?' - owner':person.role==='manager'?' - house operations':''}</div></div>
     <span class="badge ${person.role!=='cleaner'?'admin':''}">${esc(displayRole(person))}</span></div>`).join('');
   if(isLeader()){
-    html+=`<p class="sec-label">Leader tools</p>
+    html+=`<p class="sec-label">Organizer tools</p>
       <button class="btn ghost" data-autoassign>&#9851; Auto-assign open turns</button>
+      <button class="btn ghost" data-copybrief>&#128203; Copy today's brief</button>
       <button class="btn danger-outline" data-reset>Reset local demo</button>
       <p class="admin-note">Signed in as ${esc(USER.name)} - ${esc(displayRole(USER))}.</p>`;
   } else {
@@ -683,26 +787,28 @@ function renderTeam(){
   return html;
 }
 function autoAssignAll(){
-  const cleaners=TEAM.filter(person=>person.role==='cleaner');
-  const load=Object.fromEntries(cleaners.map(cleaner=>[cleaner.id,S.turns.filter(turn=>turn.assigned===cleaner.id&&turn.status!=='done').length]));
+  const workers=assignableWorkers();
+  if(!workers.length){ toast('No assignable team members yet'); return; }
+  const load=Object.fromEntries(workers.map(worker=>[worker.id,S.turns.filter(turn=>turn.assigned===worker.id&&turn.status!=='done').length]));
   const patches=[];
   commit(()=>{
     S.turns.filter(turn=>turn.status!=='done'&&!turn.assigned).forEach(turn=>{
-      const choice=[...cleaners].sort((a,b)=>load[a.id]-load[b.id])[0];
+      const choice=[...workers].sort((a,b)=>load[a.id]-load[b.id])[0];
       turn.assigned=choice.id;
       load[choice.id]+=1;
       patches.push({id:turn.id,assigned:choice.id});
     });
   },()=>Promise.all(patches.map(patch=>API.patchTurn(patch.id,{assigned:patch.assigned}))));
-  toast('Open turns assigned');
+  toast('Open turns assigned to the team');
 }
 function openAssign(turnId){
   const turn=S.turns.find(item=>item.id===turnId);
   if(!turn) return;
-  const cleaners=TEAM.filter(person=>person.role==='cleaner');
+  const cleaners=assignableWorkers();
+  if(!cleaners.length){ toast('No assignable team members yet'); return; }
   const load=id=>S.turns.filter(item=>item.assigned===id&&item.status!=='done').length;
   const suggested=[...cleaners].sort((a,b)=>load(a.id)-load(b.id))[0];
-  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Assign worker</div>
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Assign team member</div>
     <div class="sheet-sub">${esc(prop(turn.propertyId).name)} · ${fmtDay(turn.checkout)}</div>
     <div class="gate-note water-note"><span>&#9851;</span><span>Suggested: <b>${esc(suggested.name)}</b>, with the fewest open turns.</span></div>
     <div class="pick-list">${cleaners.map(cleaner=>`<button data-pick="${turn.id}:${cleaner.id}" class="${cleaner.id===suggested.id?'sel':''}">
@@ -715,7 +821,36 @@ function pickCleaner(turnId,cleanerId){
   commit(()=>{ turn.assigned=cleanerId; },()=>API.patchTurn(turnId,{assigned:cleanerId}),{render:false});
   closeSheet();
   go(VIEW);
-  toast('Worker assigned');
+  toast('Team member assigned');
+}
+function dailyBriefText(){
+  const today=todayISO();
+  const active=S.turns.filter(turn=>turn.checkout&&turn.checkout<=today&&turn.status!=='done');
+  const waterDue=WATER_ASSETS.filter(asset=>testDue(asset).due);
+  const urgent=S.alerts.filter(alert=>!alert.resolved&&alert.severity==='urgent');
+  const lines=[
+    `STR Ops brief for ${new Date().toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'short',day:'numeric'})}`,
+    '',
+    'Turns',
+    ...(active.length?active.map(turn=>`${propertyEmoji(turn.propertyId)} ${prop(turn.propertyId).name}: ${member(turn.assigned)?.name||'Unassigned'} (${turn.status.replace('_',' ')})`) : ['No turns due today.']),
+    '',
+    'Water',
+    ...(waterDue.length?waterDue.map(asset=>`${propertyEmoji(asset.propertyId)} ${prop(asset.propertyId).name} ${asset.name}: due now`) : ['Water is current.']),
+    '',
+    'Urgent',
+    ...(urgent.length?urgent.map(alert=>`${propertyEmoji(alert.propertyId)} ${alert.title}`) : ['No urgent alerts.']),
+  ];
+  return lines.join('\n');
+}
+async function copyDailyBrief(){
+  const text=dailyBriefText();
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('Brief copied for Ana to send');
+  }catch{
+    openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Today brief</div>
+      <div class="field"><textarea rows="12">${esc(text)}</textarea></div>`);
+  }
 }
 
 /* ---------------- reminders, sheet, bindings ---------------- */
@@ -742,9 +877,10 @@ function bindView(){
   $$('[data-claim]').forEach(element=>element.onclick=event=>{ event.stopPropagation(); claimTurn(element.dataset.claim); });
   $$('[data-quickdone]').forEach(element=>element.onclick=event=>{ event.stopPropagation(); quickDone(element.dataset.quickdone); });
   $$('[data-log]').forEach(element=>element.onclick=event=>{ event.stopPropagation(); openLog(element.dataset.log); });
+  $$('[data-waterphoto]').forEach(element=>element.onclick=event=>{ event.stopPropagation(); captureWaterPhoto(element.dataset.waterphoto); });
   $$('[data-water]').forEach(element=>element.onclick=event=>{
     const trigger=event.target.closest('[data-water]');
-    if(trigger&&trigger!==element){ event.stopPropagation(); openLog(trigger.dataset.water); }
+    if(trigger){ event.stopPropagation(); openLog(trigger.dataset.water); }
   });
   $$('[data-open-cockpit]').forEach(element=>element.onclick=()=>go('cockpit'));
   $$('[data-compliance]').forEach(element=>element.onclick=exportCompliance);
@@ -761,6 +897,7 @@ function bindView(){
     if(!alert) return;
     commit(()=>{ alert.resolved=true; },null);
   });
+  $$('[data-copybrief]').forEach(element=>element.onclick=copyDailyBrief);
   $$('[data-autoassign]').forEach(element=>element.onclick=autoAssignAll);
   $$('[data-reset]').forEach(element=>element.onclick=()=>{
     if(confirm('Reset all local demo changes?')){
@@ -777,18 +914,7 @@ $('#sheet').addEventListener('click',event=>{
   const check=event.target.closest('[data-check]');
   if(check&&!event.target.closest('[data-photo]')){
     const [id,index]=check.dataset.check.split(':');
-    const turn=S.turns.find(item=>item.id===id);
-    if(!isLeader()&&turn?.assigned!==USER.id){
-      toast('Claim this turn before updating its checklist');
-      return;
-    }
-    const checked=!(S.checks[id]||{})[index];
-    commit(()=>{
-      S.checks[id]=S.checks[id]||{};
-      S.checks[id][index]=checked;
-      if(turn?.status==='needs_cleaning') turn.status='in_progress';
-    },()=>API.putCheck(id,Number(index),checked),{render:false});
-    openTurn(id);
+    toggleCheck(id,index);
     return;
   }
   const photo=event.target.closest('[data-photo]');
@@ -809,6 +935,8 @@ $('#sheet').addEventListener('click',event=>{
   if(pick){ const [turnId,cleanerId]=pick.dataset.pick.split(':'); pickCleaner(turnId,cleanerId); return; }
   const saveWater=event.target.closest('[data-savelog]');
   if(saveWater){ saveLog(saveWater.dataset.savelog); return; }
+  const waterPhoto=event.target.closest('[data-waterphoto]');
+  if(waterPhoto){ captureWaterPhoto(waterPhoto.dataset.waterphoto); return; }
   if(event.target.closest('[data-savetask]')){ saveTask(); return; }
   if(event.target.closest('[data-savefinancial]')) saveFinancial();
 });

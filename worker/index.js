@@ -352,7 +352,7 @@ async function handleTurnChecks(request, env, user, turnId, rawIndex) {
   const itemIdx = integer(rawIndex, 'itemIdx', { min: 0, max: 500 });
   const body = await readJson(request);
   const done = body.done === true || body.done === 1 || body.checked === true ? 1 : 0;
-  const photoKey = optionalString(body.photoKey, 'photoKey', { max: 500 });
+  const photoKey = optionalString(body.photoKey, 'photoKey', { max: 500 }) ?? null;
   if (photoKey) {
     const photo = await firstOr404(
       env,
@@ -395,10 +395,22 @@ async function handleWater(request, env, user, parts) {
     const ph = finiteNumber(body.ph, 'ph', { min: 0, max: 14 });
     const alk = finiteNumber(body.alk, 'alk', { min: 0, max: 500 });
     const note = optionalString(body.note, 'note', { max: 2000 }) ?? null;
+    const photoKey = optionalString(body.photoKey, 'photoKey', { max: 500 }) ?? null;
+    if (photoKey) {
+      const photo = await firstOr404(
+        env,
+        'SELECT object_key, uploaded_by FROM photo_objects WHERE object_key=?',
+        [photoKey],
+        'Photo',
+      );
+      if (!manager(user) && photo.uploaded_by !== user.id) {
+        throw new HttpError(403, 'forbidden', 'That water-test photo belongs to another team member.');
+      }
+    }
     await env.DB.prepare(
-      `INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, logged_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(readingId, assetId, nowIso(), chlorine, ph, alk, note, user.id).run();
+      `INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, photo_key, logged_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(readingId, assetId, nowIso(), chlorine, ph, alk, note, photoKey, user.id).run();
     await audit(env, user, 'create', 'water_reading', readingId);
     return json(mapReading(await firstOr404(
       env,
@@ -830,6 +842,7 @@ async function handlePhotos(request, env, user, parts) {
     await env.PHOTOS.delete(key);
     await env.DB.prepare('UPDATE turn_checks SET photo_key=NULL WHERE photo_key=?').bind(key).run();
     await env.DB.prepare('UPDATE maintenance_tickets SET photo_key=NULL WHERE photo_key=?').bind(key).run();
+    await env.DB.prepare('UPDATE water_readings SET photo_key=NULL WHERE photo_key=?').bind(key).run();
     await env.DB.prepare('DELETE FROM photo_objects WHERE object_key=?').bind(key).run();
     await audit(env, user, 'delete', 'photo', key);
     return json({ ok: true });
@@ -844,6 +857,7 @@ async function purgeExpiredPhotos(env) {
     await env.PHOTOS.delete(row.object_key);
     await env.DB.prepare('UPDATE turn_checks SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
     await env.DB.prepare('UPDATE maintenance_tickets SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
+    await env.DB.prepare('UPDATE water_readings SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
     await env.DB.prepare('DELETE FROM photo_objects WHERE object_key=?').bind(row.object_key).run();
   }
   return expired.length;

@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS water_readings (
   ph REAL NOT NULL,
   alk REAL NOT NULL,
   note TEXT,
+  photo_key TEXT,
   logged_by TEXT REFERENCES team(id) ON DELETE SET NULL
 );
 

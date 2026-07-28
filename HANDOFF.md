@@ -17,20 +17,22 @@ npm run test-version
 
 Open `http://127.0.0.1:8787`. Local test mode signs in when a name is tapped. Fallback
 PINs are Gav (Dev) `135790`, Gale (Owner) `975310`, Larry (House Manager) `246810`,
-and Anna (Worker) `1111`.
+and Ana (Owner + Organizer) `864210`.
 
 Completed in this checkpoint:
 
 - Unified Worker plus static-assets runtime, D1 migrations, idempotent demo seed, R2
   binding, authenticated sessions, rate limiting, role enforcement, audit log, computed
   alerts, and booking/iCal reconciliation
-- Dev/owner/house-manager/worker role migration
+- Dev/owner/house-manager/worker role migration with the corrected test roster
 - Ops cockpit with financials, tasks, alerts, goals, and property snapshots
-- Worker claim/start state, turnover windows, issue reporting, water streak, two-day
-  test cadence, and phone-width layout
+- Team claim/start state, turnover windows, issue reporting, safe-water streak, two-day
+  test cadence, property emojis/colors, and phone-width layout
 - Progressive API adapter with a localStorage fallback for the test/demo experience
 - Authenticated R2 verification-photo upload, server-enforced checklist/photo gate, and
   invalidation when a photo is deleted or purged
+- Photo Test Log for pool/hot-tub kit photos: take/upload the kit photo, confirm chlorine,
+  pH, and alkalinity, then store the reading and photo together
 - Automated backend/frontend tests, positive/negative ready-gate coverage, local Worker
   integration test, and a 375px browser pass
 
@@ -53,12 +55,13 @@ A **private, phone-first PWA** for **Short Term Retreats (STR)** — 4 waterfron
 rentals near Peoria, IL, run by a tiny team. It shows the team exactly what to clean and
 when (driven by the Airbnb calendar), logs pool + hot tub chemistry, and gives one daily
 overview. **v2 adds an Ops cockpit** (business numbers, tasks/schedule, an exceptions
-feed, goals) for Gav, Gale, and Larry.
+feed, goals) for Gav, Gale, Larry, and Ana.
 
 - **This is an internal tool, NOT a SaaS.** No sign-up, no multi-tenant, no billing. Do not
   build any of that.
 - **Standalone.** Do NOT wire this into Limitless, Alfred, Discord, or any other system.
-- **Dev:** Gav (Gavin Johnson). **Owner:** Gale. **House manager:** Larry. **Worker:** Anna.
+- **Dev:** Gav (Gavin Johnson). **Owners:** Gale and Ana. **House manager:** Larry.
+  Ana is the owner-organizer for assigning work and sending the daily brief.
 
 ### GO-LIVE BLOCKER (call this out to Gav, do not let it stall the build)
 The turnover calendar needs **7 Airbnb/VRBO `.ics` export URLs**. Gale or Larry should
@@ -75,7 +78,7 @@ Working v1 demo, verified in-browser. Runs with no build step:
 ```bash
 python -m http.server 8123 --directory public   # then open http://localhost:8123
 ```
-Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Anna 1111.
+Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Ana 864210.
 
 - `public/index.html` — app shell + tab bar. `public/styles.css` — the **dark-luxury design
   system** (near-black `#0F0F10`, bone `#F4F1EC`, gold `#C9A46B`, teal `#1F4E5F`, red
@@ -94,9 +97,10 @@ Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Anna 1111.
   push_subscriptions, supplies, sessions; turns has checkout_time/checkin_time/started_at).
 - `wrangler.toml` — D1 + R2 bindings, cron, secret notes. `.env.example` — every secret.
 
-Features already built in the demo: PIN login, turnover board (iCal-shaped), per-property
-checklists, photo-verified ready gate, auto-assign workers, pool/hot-tub log with dosing
-hints + status, compliance PDF export, same-day-turn red flag.
+Features already built in the demo: local name-tap login, turnover board (iCal-shaped),
+per-property checklists that can be checked and unchecked, photo-verified ready gate,
+auto-assign team members, Photo Test Log for pool/hot-tub kit photos, care hints + status,
+compliance export, same-day-turn red flag, and Ana's copyable daily brief.
 
 ---
 
@@ -106,9 +110,9 @@ hints + status, compliance PDF export, same-day-turn red flag.
 |---|---|
 | Product type | Internal tool only. No SaaS/multi-tenant/billing. |
 | Reminders | **Web Push + in-app only.** No SMS, no email provider. (ASSUMPTION: push is enough; skip the email digest for now.) |
-| Roles | `dev` (Gav), `owner` (Gale), `manager` (Larry), `cleaner` (Anna). See §3. |
+| Roles | `dev` (Gav), `owner` (Gale and Ana), `manager` (Larry), `cleaner` for future outside cleaners. See §3. |
 | Cockpit access | Dev, owner, and house manager see the cockpit. Tasks/schedule/alerts/goals are shared. |
-| Team roster | Seed the actual test roster: Gav, Gale, Larry, Anna. Maria and Jess are stale demo users and should stay inactive. |
+| Team roster | Seed the actual test roster: Gav, Gale, Larry, Ana. Maria and Jess are stale demo users and should stay inactive. |
 | Worker visibility | ASSUMPTION: workers see **all** turns (matches v1). Assigned turns are highlighted. |
 | Money source | ASSUMPTION: **manual entry** per property/month in the cockpit; occupancy is **derived** from turns/feed. Wire a "pull from feed × nightly rate" helper but do not depend on it. |
 | Pool test cadence | ASSUMPTION: **due every 2 days**; overdue → alerts feed. Make the interval a constant that's easy to change. |
@@ -124,12 +128,13 @@ Anything Gav later corrects overrides these — keep them in one place so they'r
 
 `team.role` now supports **`dev|owner|manager|cleaner`**:
 - **dev** = Gav, app build and test access.
-- **owner** = Gale, business owner.
+- **owner** = Gale and Ana. Gale is owner. Ana is owner-organizer with cockpit access,
+  assignments, tasks, and the daily brief tool.
 - **manager** = Larry, house manager with operations control.
-- **cleaner** = Anna, shown in the UI as Worker; the **cockpit tab is hidden**.
+- **cleaner** = future outside cleaner role. The **cockpit tab is hidden** for cleaners.
 
 Keep `isLeaderRole()` true for `dev|owner|manager`, and use `isOwner()` only where
-Gale-level ownership is required. Local test mode signs in by tapping a person; non-local
+owner-only access is required. Local test mode signs in by tapping a person; non-local
 environments still use the PIN pad.
 
 ---
@@ -156,13 +161,16 @@ phone screen with four sections:
 ### Also locked in (build alongside the cockpit)
 - **Real turnover window** — show `checkout_time` / `checkin_time` on turn cards
   ("Clean by 11am · Guest 4pm") when the feed provides them; fall back to date-only.
-- **Live worker status** — a one-tap **"I'm on it"** (sets `started_at`) and **"Done"** on a
+- **Live team status** — a one-tap **"Claim + Start"** (sets `assigned_to` and `started_at`) and **"Done"** on a
   turn, with timestamps. Drives the board's live state and the Alerts feed (unstarted/late).
 - **Damage/issue report** — from a worker's phone: photo + note → opens a
   `maintenance_ticket` and pushes leadership. Workers hit problems first; capture in the
   moment.
-- **Pool compliance streak** — on the Water tab, a visible "N days logged · next due <date>"
-  to make the habit stick and keep the insurance PDF airtight.
+- **Pool compliance streak** — on the Water tab, a visible safe-water streak and due status
+  to make the habit stick and keep the insurance/compliance export airtight.
+- **Photo Test Log** — MyPoolMath-inspired tracking: keep pool/hot-tub readings, kit photos,
+  timestamps, status, and simple care hints in STR Ops. This test version does not infer
+  chemistry from a random photo; the team confirms the 3 numbers before saving.
 
 ### Roadmap (build after the above, in this order)
 Worker hours + payouts (feeds Business numbers) → supplies auto-count + reorder list →
@@ -200,7 +208,8 @@ changes.
   `turn_checks.photo_url` / ticket. `GET /api/photos/:key` → **signed** stream (never public).
 
 **Water**
-- `GET /api/water` · `POST /api/water` `{assetId, chlorine, ph, alk, note}` (server stamps ts).
+- `GET /api/water` · `POST /api/water` `{assetId, chlorine, ph, alk, note, photoKey?}`
+  (server stamps ts). `photoKey` is a private R2 object key from `/api/photos`.
 
 **Cockpit**
 - `GET/POST/PATCH /api/financials` · `GET/POST/PATCH/DELETE /api/tasks`
@@ -222,7 +231,7 @@ VEVENT when present.
 
 - **Server-side PIN check.** Never trust the client. Issue an httpOnly, Secure, SameSite
   session cookie signed with `SESSION_SECRET`; store in `sessions`; expire in ~30 days.
-- **Stronger PINs for elevated roles.** dev/owner/manager use a **6-digit** PIN; workers
+- **Stronger PINs for elevated roles.** dev/owner/manager use a **6-digit** PIN; cleaners
   may keep 4. Lockout after 5 bad tries; rate-limit `/api/login`.
 - **Cloudflare Access in front of the whole subdomain** (free, email one-time-code) so only
   the team's emails can even load the app. Belt-and-suspenders over PINs.
@@ -293,16 +302,17 @@ wrangler deploy
 ## 11. Verification (how you prove it's done)
 
 - **Backend swap:** clear localStorage, reload → all data still present (it's in D1).
-- **Roles:** log in as Gav (Dev), Gale (Owner), and Larry (House Manager) → cockpit visible;
-  log in as Anna (Worker) → cockpit hidden, only turns.
+- **Roles:** log in as Gav (Dev), Gale (Owner), Larry (House Manager), and Ana
+  (Owner + Organizer) → cockpit visible. If a cleaner is added later, cockpit stays hidden.
 - **Cockpit:** seed a same-day turn + a red pool reading + an unstarted late turn + an open
   ticket → **all four appear in Alerts**. Add a financial row → portfolio total updates. Add
   a goal → progress bar renders. Add an ops task due today → shows in today + alerts.
-- **Live status:** tap "I'm on it" → timestamp + board flips; leave a turn unstarted past
+- **Live status:** tap "Claim + Start" → assignee/timestamp + board flips; leave a turn unstarted past
   ready-by → it surfaces in Alerts.
 - **Web Push:** subscribe on a real phone, trigger a due turn → a clean push fires.
-- **Photos:** upload a verification photo → lands in R2, served via signed URL; ready-gate
-  blocks "Done" until required photos exist.
+- **Photos:** upload a verification photo → lands in R2, served via private API URL; ready-gate
+  blocks "Done" until required photos exist. Upload a water kit photo → water reading stores
+  `photoKey`, and deleting/purging the photo clears that link.
 - **Demo→live:** run on seed data, set one real iCal secret, hit `/api/sync` → a real turn
   replaces the demo turn with no code change.
 - **Phone test:** whole thing on a real device, big buttons, no horizontal scroll.

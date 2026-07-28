@@ -20,11 +20,12 @@ test('demo state uses canonical camelCase shape and corrected team roles',async(
   vm.runInContext(`${source}\nglobalThis.__demo={TEAM,DB,iso};`,context);
   const {TEAM,DB,iso}=context.__demo;
   const state=DB.load();
-  assert.deepEqual(Array.from(TEAM,item=>item.role),['dev','owner','manager','cleaner']);
+  assert.deepEqual(Array.from(TEAM,item=>item.role),['dev','owner','manager','owner']);
   assert.equal(TEAM.find(item=>item.id==='gav').pin.length,6);
   assert.equal(TEAM.find(item=>item.id==='gale').role,'owner');
   assert.equal(TEAM.find(item=>item.id==='larry').pin.length,6);
-  assert.equal(TEAM.find(item=>item.id==='anna').role,'cleaner');
+  assert.equal(TEAM.find(item=>item.id==='anna').name,'Ana');
+  assert.equal(TEAM.find(item=>item.id==='anna').role,'owner');
   for(const key of ['turns','readings','financials','tasks','goals','alerts','tickets','supplies']){
     assert.ok(Array.isArray(state[key]),`${key} should be seeded`);
   }
@@ -86,7 +87,7 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   assert.match(app,/startedAt:true/);
   assert.match(app,/Cloud sync failed/);
   assert.ok(!app.includes('Test'+' PIN'),'login cards should not show demo credentials');
-  for(const phrase of ['I’m on it','Done · ready for guest','Report damage or issue','balanced-log streak','Ops cockpit']){
+  for(const phrase of ['Claim + Start','Photo Test Log',"Copy today's brief",'Done · ready for guest','Report damage or issue','safe water streak','Ops cockpit']){
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
   assert.match(css,/@media \(max-width:390px\)/);
