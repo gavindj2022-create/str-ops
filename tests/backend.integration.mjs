@@ -1,0 +1,312 @@
+import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
+import path from 'node:path';
+import process from 'node:process';
+
+const root = process.cwd();
+const wrangler = path.join(root, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+const port = 8791;
+const base = `http://127.0.0.1:${port}`;
+
+function runWrangler(args) {
+  const result = spawnSync(process.execPath, [wrangler, ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  if (result.status !== 0) {
+    throw new Error(`wrangler ${args.join(' ')} failed\n${result.stdout}\n${result.stderr}`);
+  }
+}
+
+async function waitForServer(child) {
+  const deadline = Date.now() + 30_000;
+  let lastError;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`wrangler exited early with ${child.exitCode}`);
+    try {
+      const response = await fetch(`${base}/api/health`);
+      if (response.status === 200) return;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error(`wrangler did not become ready: ${lastError || 'timeout'}`);
+}
+
+async function api(pathname, { method = 'GET', cookie, body, form } = {}) {
+  const headers = {};
+  if (cookie) headers.cookie = cookie;
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  const response = await fetch(`${base}${pathname}`, {
+    method,
+    headers,
+    body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
+  });
+  let payload = null;
+  if (response.headers.get('content-type')?.includes('application/json')) payload = await response.json();
+  return { response, payload };
+}
+
+function cookieFrom(response) {
+  const value = response.headers.get('set-cookie');
+  assert.ok(value, 'login should set a cookie');
+  return value.split(';')[0];
+}
+
+runWrangler(['d1', 'migrations', 'apply', 'str-ops', '--local']);
+runWrangler(['d1', 'execute', 'str-ops', '--local', '--file=seed/demo.sql']);
+runWrangler([
+  'd1',
+  'execute',
+  'str-ops',
+  '--local',
+  '--command=DELETE FROM turn_checks WHERE turn_id IN (\'demo-turn-hickory\', \'demo-turn-westgate\')',
+]);
+
+const child = spawn(process.execPath, [
+  wrangler,
+  'dev',
+  '--local',
+  '--port',
+  String(port),
+  '--var',
+  'SESSION_SECRET:test-only-session-secret-32-characters',
+], {
+  cwd: root,
+  stdio: ['ignore', 'pipe', 'pipe'],
+  windowsHide: true,
+});
+
+let logs = '';
+child.stdout.on('data', chunk => { logs += chunk; });
+child.stderr.on('data', chunk => { logs += chunk; });
+
+try {
+  await waitForServer(child);
+
+  const health = await api('/api/health');
+  assert.equal(health.response.status, 200);
+  assert.equal(health.payload.schemaVersion, 2);
+  assert.equal(health.payload.database, true);
+
+  const options = await api('/api/login-options');
+  assert.equal(options.response.status, 200);
+  assert.ok(options.payload.users.some(user => user.id === 'anna' && user.role === 'manager'));
+  assert.equal(JSON.stringify(options.payload).toLowerCase().includes('pin'), false);
+
+  const anonymousState = await api('/api/state');
+  assert.equal(anonymousState.response.status, 401);
+  assert.equal(anonymousState.payload.error.code, 'authentication_required');
+
+  const managerLogin = await api('/api/login', {
+    method: 'POST',
+    body: { teamId: 'anna', pin: '246810' },
+  });
+  assert.equal(managerLogin.response.status, 200);
+  assert.equal(managerLogin.payload.user.role, 'manager');
+  const managerCookie = cookieFrom(managerLogin.response);
+
+  const managerState = await api('/api/state', { cookie: managerCookie });
+  assert.equal(managerState.response.status, 200);
+  assert.equal(managerState.payload.schemaVersion, 2);
+  assert.ok(managerState.payload.turns.length >= 5);
+  const chicagoToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const sameDayTurn = managerState.payload.turns.find(turn => turn.id === 'demo-turn-hickory');
+  assert.equal(sameDayTurn.checkout, chicagoToday);
+  assert.equal(sameDayTurn.checkinTime, '16:00');
+  assert.ok(managerState.payload.financials.every(row => Number.isInteger(row.revenueCents)));
+  assert.equal(JSON.stringify(managerState.payload).includes('pin_hash'), false);
+  const alertTypes = new Set(managerState.payload.alerts.map(item => item.type));
+  for (const expected of ['water_bad', 'maintenance', 'supply', 'task']) {
+    assert.ok(alertTypes.has(expected), `missing ${expected} alert`);
+  }
+
+  const taskId = `integration-task-${Date.now()}`;
+  const createdTask = await api('/api/tasks', {
+    method: 'POST',
+    cookie: managerCookie,
+    body: {
+      id: taskId,
+      title: 'Integration test task',
+      propertyId: 'westgate',
+      dueDate: new Date().toISOString().slice(0, 10),
+      priority: 'high',
+    },
+  });
+  assert.equal(createdTask.response.status, 201);
+  assert.equal(createdTask.payload.priority, 'high');
+
+  const completedTask = await api(`/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    cookie: managerCookie,
+    body: { status: 'done' },
+  });
+  assert.equal(completedTask.response.status, 200);
+  assert.equal(completedTask.payload.done, true);
+
+  const reading = await api('/api/water', {
+    method: 'POST',
+    cookie: managerCookie,
+    body: { assetId: 'westgate-tub', chlorine: 3, ph: 7.4, alk: 100, note: 'Integration test' },
+  });
+  assert.equal(reading.response.status, 201);
+  assert.equal(reading.payload.assetId, 'westgate-tub');
+
+  const turnBefore = managerState.payload.turns.find(turn => turn.id === 'demo-turn-westgate');
+  const patchedTurn = await api('/api/turns/demo-turn-westgate', {
+    method: 'PATCH',
+    cookie: managerCookie,
+    body: { status: 'in_progress', startedAt: true },
+  });
+  assert.equal(patchedTurn.response.status, 200);
+  assert.equal(patchedTurn.payload.status, 'in_progress');
+
+  const cleanerLogin = await api('/api/login', {
+    method: 'POST',
+    body: { teamId: 'maria', pin: '1111' },
+  });
+  assert.equal(cleanerLogin.response.status, 200);
+  const cleanerCookie = cookieFrom(cleanerLogin.response);
+  const cleanerState = await api('/api/state', { cookie: cleanerCookie });
+  assert.equal(cleanerState.response.status, 200);
+  assert.deepEqual(cleanerState.payload.financials, []);
+  assert.deepEqual(cleanerState.payload.tasks, []);
+  assert.deepEqual(cleanerState.payload.goals, []);
+  assert.deepEqual(cleanerState.payload.alerts, []);
+
+  const cleanerForbidden = await api('/api/tasks', { cookie: cleanerCookie });
+  assert.equal(cleanerForbidden.response.status, 403);
+  assert.equal(cleanerForbidden.payload.error.code, 'forbidden');
+
+  const checklistBeforeClaim = await api('/api/turns/demo-turn-hickory/checks/0', {
+    method: 'PUT',
+    cookie: cleanerCookie,
+    body: { checked: true },
+  });
+  assert.equal(checklistBeforeClaim.response.status, 403);
+
+  const legacyBrokenClaim = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: cleanerCookie,
+    body: { assigned: 'maria', status: 'in_progress' },
+  });
+  assert.equal(legacyBrokenClaim.response.status, 403);
+
+  const cleanerClaim = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: cleanerCookie,
+    body: { status: 'in_progress', startedAt: true },
+  });
+  assert.equal(cleanerClaim.response.status, 200);
+  assert.equal(cleanerClaim.payload.assigned, 'maria');
+  assert.ok(cleanerClaim.payload.startedAt);
+
+  const prematureDone = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: cleanerCookie,
+    body: { status: 'done', completedAt: true },
+  });
+  assert.equal(prematureDone.response.status, 409);
+  assert.equal(prematureDone.payload.error.code, 'turn_not_ready');
+
+  const fakePhoto = await api('/api/turns/demo-turn-hickory/checks/0', {
+    method: 'PUT',
+    cookie: cleanerCookie,
+    body: { checked: true, photoKey: 'private/not-real.png' },
+  });
+  assert.equal(fakePhoto.response.status, 404);
+
+  const photoForm = new FormData();
+  photoForm.append('file', new Blob(['integration-photo'], { type: 'image/png' }), 'integration.png');
+  const uploadedPhoto = await api('/api/photos', {
+    method: 'POST',
+    cookie: cleanerCookie,
+    form: photoForm,
+  });
+  assert.equal(uploadedPhoto.response.status, 201);
+  assert.match(uploadedPhoto.payload.key, /^private\//);
+
+  const verifiedCheck = await api('/api/turns/demo-turn-hickory/checks/0', {
+    method: 'PUT',
+    cookie: cleanerCookie,
+    body: { checked: true, photoKey: uploadedPhoto.payload.key },
+  });
+  assert.equal(verifiedCheck.response.status, 200);
+  assert.equal(verifiedCheck.payload.photoKey, uploadedPhoto.payload.key);
+
+  for (const itemIdx of [1, 2, 3, 4]) {
+    const completedCheck = await api(`/api/turns/demo-turn-hickory/checks/${itemIdx}`, {
+      method: 'PUT',
+      cookie: cleanerCookie,
+      body: { checked: true, photoKey: uploadedPhoto.payload.key },
+    });
+    assert.equal(completedCheck.response.status, 200);
+  }
+
+  const completedTurn = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: cleanerCookie,
+    body: { status: 'done', completedAt: true },
+  });
+  assert.equal(completedTurn.response.status, 200);
+  assert.equal(completedTurn.payload.status, 'done');
+
+  const deletePhoto = await api(`/api/photos/${uploadedPhoto.payload.key}`, {
+    method: 'DELETE',
+    cookie: managerCookie,
+  });
+  assert.equal(deletePhoto.response.status, 200);
+
+  const reopenAfterPhotoDelete = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: managerCookie,
+    body: { status: 'in_progress', completedAt: null },
+  });
+  assert.equal(reopenAfterPhotoDelete.response.status, 200);
+
+  const deletedPhotoBlocksDone = await api('/api/turns/demo-turn-hickory', {
+    method: 'PATCH',
+    cookie: managerCookie,
+    body: { status: 'done', completedAt: true },
+  });
+  assert.equal(deletedPhotoBlocksDone.response.status, 409);
+  assert.equal(deletedPhotoBlocksDone.payload.error.code, 'turn_not_ready');
+
+  await api(`/api/tasks/${taskId}`, { method: 'DELETE', cookie: managerCookie });
+  await api(`/api/water/${reading.payload.id}`, { method: 'DELETE', cookie: managerCookie });
+  await api('/api/turns/demo-turn-westgate', {
+    method: 'PATCH',
+    cookie: managerCookie,
+    body: {
+      status: turnBefore.status,
+      startedAt: turnBefore.startedAt,
+      completedAt: turnBefore.completedAt,
+    },
+  });
+
+  console.log('Backend integration test passed: auth, roles, CRUD, claim, ready gate, photos, water, and alerts.');
+} catch (error) {
+  console.error(logs);
+  throw error;
+} finally {
+  child.kill('SIGTERM');
+  await Promise.race([
+    once(child, 'exit'),
+    new Promise(resolve => setTimeout(resolve, 3000)),
+  ]);
+  runWrangler([
+    'd1',
+    'execute',
+    'str-ops',
+    '--local',
+    '--command=DELETE FROM turn_checks WHERE turn_id=\'demo-turn-hickory\'; UPDATE turns SET status=\'needs_cleaning\', assigned_to=NULL, started_at=NULL, completed_at=NULL WHERE id=\'demo-turn-hickory\'',
+  ]);
+}

@@ -1,0 +1,23 @@
+{
+  "name": "str-ops",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --var SESSION_SECRET:test-only-session-secret-32-characters",
+    "test-version": "npm run db:setup && npm run dev",
+    "db:migrate": "wrangler d1 migrations apply str-ops --local",
+    "db:seed": "wrangler d1 execute str-ops --local --file=seed/demo.sql",
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "test": "node --test tests/backend.unit.test.mjs tests/frontend.contract.test.mjs",
+    "test:backend": "node tests/backend.integration.mjs",
+    "test:all": "npm test && npm run test:backend",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.114.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

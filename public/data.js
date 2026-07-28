@@ -1,9 +1,9 @@
-/* STR Ops — data layer.
+/* STR Ops data layer.
    Seeded with the four real Short Term Retreats properties.
    Persists to localStorage. This is the swap point: replace loadTurns()/save()
    with fetch() calls to the Cloudflare Worker + D1 once the .ics feeds are live. */
 
-const STORE_KEY = 'strops.v1';
+const STORE_KEY = 'strops.v2';
 
 const PROPERTIES = [
   { id:'millpoint', name:'Millpoint Waterfront', location:'East Peoria', beds:2, baths:2, sleeps:6,
@@ -66,24 +66,28 @@ const CHECKLISTS = {
 };
 
 const TEAM = [
-  { id:'anna',  name:'Anna',  role:'admin',   pin:'1234', color:'#C9A46B' },
+  { id:'gav',   name:'Gav',   role:'owner',   pin:'135790', color:'#E0A94B' },
+  { id:'anna',  name:'Anna',  role:'manager', pin:'246810', color:'#C9A46B' },
   { id:'maria', name:'Maria', role:'cleaner', pin:'1111', color:'#4FB0C6' },
   { id:'jess',  name:'Jess',  role:'cleaner', pin:'2222', color:'#5BB98B' },
-  { id:'gav',   name:'Gav',   role:'admin',   pin:'0000', color:'#E0A94B' },
 ];
 
 /* ---- date helpers ---- */
-function iso(d){ return d.toISOString().slice(0,10); }
+function iso(d){
+  return new Intl.DateTimeFormat('en-CA',{
+    timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit',
+  }).format(d);
+}
 function addDays(n){ const d=new Date(); d.setDate(d.getDate()+n); return iso(d); }
 
 /* Seed turns emulate what the Airbnb iCal feed will provide (checkout=clean-by). */
 function seedTurns(){
   return [
-    { id:'t1', propertyId:'westgate', checkout:addDays(0), checkin:addDays(2), status:'needs_cleaning', assigned:'maria' },
-    { id:'t2', propertyId:'hickory',  checkout:addDays(0), checkin:addDays(0), status:'needs_cleaning', assigned:null },   // same-day turn
-    { id:'t3', propertyId:'millpoint',checkout:addDays(0), checkin:addDays(1), status:'in_progress',   assigned:'jess' },
-    { id:'t4', propertyId:'galena',   checkout:addDays(1), checkin:addDays(3), status:'needs_cleaning', assigned:null },
-    { id:'t5', propertyId:'westgate', checkout:addDays(4), checkin:addDays(6), status:'needs_cleaning', assigned:null },
+    { id:'t1', propertyId:'westgate', checkout:addDays(0), checkin:addDays(2), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:'maria' },
+    { id:'t2', propertyId:'hickory',  checkout:addDays(0), checkin:addDays(0), checkoutTime:'10:00', readyBy:'15:30', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
+    { id:'t3', propertyId:'millpoint',checkout:addDays(0), checkin:addDays(1), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'in_progress', assigned:'jess' },
+    { id:'t4', propertyId:'galena',   checkout:addDays(1), checkin:addDays(3), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
+    { id:'t5', propertyId:'westgate', checkout:addDays(4), checkin:addDays(6), checkoutTime:'10:00', readyBy:'16:00', checkinTime:'16:00', status:'needs_cleaning', assigned:null },
   ];
 }
 function seedReadings(){
@@ -95,14 +99,67 @@ function seedReadings(){
   ];
 }
 
+function seedFinancials(){
+  return [
+    { id:'f1', month:addDays(0).slice(0,7), propertyId:'westgate', revenueCents:842000, expensesCents:231000, cleanerPayoutCents:92000 },
+    { id:'f2', month:addDays(0).slice(0,7), propertyId:'hickory', revenueCents:706000, expensesCents:188000, cleanerPayoutCents:76000 },
+    { id:'f3', month:addDays(0).slice(0,7), propertyId:'millpoint', revenueCents:514000, expensesCents:121000, cleanerPayoutCents:54000 },
+    { id:'f4', month:addDays(0).slice(0,7), propertyId:'galena', revenueCents:468000, expensesCents:108000, cleanerPayoutCents:48000 },
+  ];
+}
+function seedTasks(){
+  return [
+    { id:'task1', title:'Replace Westgate patio string lights', propertyId:'westgate', assigneeId:'anna', priority:'high', dueDate:addDays(1), status:'open' },
+    { id:'task2', title:'Order Millpoint kayak life jackets', propertyId:'millpoint', assigneeId:'gav', priority:'normal', dueDate:addDays(4), status:'open' },
+    { id:'task3', title:'Confirm Hickory HVAC service', propertyId:'hickory', assigneeId:'anna', priority:'high', dueDate:addDays(-1), status:'open' },
+  ];
+}
+function seedGoals(){
+  return [
+    { id:'goal1', title:'Monthly revenue', target:3200000, current:2530000, unit:'cents', period:'This month' },
+    { id:'goal2', title:'Turns ready on time', target:98, current:94, unit:'percent', period:'Last 30 days' },
+    { id:'goal3', title:'Guest rating', target:4.9, current:4.86, unit:'rating', period:'Rolling 90 days' },
+  ];
+}
+function seedAlerts(){
+  return [
+    { id:'alert1', type:'water', severity:'urgent', title:'Westgate pool chlorine is low', detail:'Last reading was 0.6 ppm. Treat and retest before guest arrival.', propertyId:'westgate', createdAt:new Date().toISOString(), resolved:false },
+    { id:'alert2', type:'turn', severity:'urgent', title:'Hickory same-day turn is unassigned', detail:'Cleaning window is 10:00 AM–3:30 PM today.', propertyId:'hickory', createdAt:new Date().toISOString(), resolved:false },
+    { id:'alert3', type:'turn', severity:'watch', title:'Millpoint turn may run late', detail:'Cleaning started, but the ready-by window is approaching.', propertyId:'millpoint', createdAt:new Date().toISOString(), resolved:false },
+    { id:'alert4', type:'ticket', severity:'watch', title:'Open damage ticket at Galena', detail:'Guest reported a loose bedroom door handle.', propertyId:'galena', createdAt:new Date().toISOString(), resolved:false },
+    { id:'alert5', type:'supply', severity:'watch', title:'Westgate coffee pods are low', detail:'8 remaining; reorder threshold is 12.', propertyId:'westgate', createdAt:new Date().toISOString(), resolved:false },
+    { id:'alert6', type:'task', severity:'urgent', title:'Hickory HVAC task is overdue', detail:'Confirm service appointment and update the team.', propertyId:'hickory', createdAt:new Date().toISOString(), resolved:false },
+  ];
+}
+function seedTickets(){
+  return [{ id:'ticket1', turnId:null, propertyId:'galena', category:'damage', severity:'medium', summary:'Loose bedroom door handle', note:'Guest reported movement at checkout.', status:'open', reportedBy:'anna', createdAt:new Date().toISOString() }];
+}
+function seedSupplies(){
+  return [{ id:'supply1', propertyId:'westgate', name:'Coffee pods', quantity:8, reorderAt:12, unit:'pods', status:'low' }];
+}
+
 const DB = {
   load(){
     let s;
     try { s = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e){ s=null; }
-    if(!s || !s.turns){
-      s = { turns:seedTurns(), readings:seedReadings(), checks:{}, photos:{}, tickets:[] };
-      localStorage.setItem(STORE_KEY, JSON.stringify(s));
-    }
+    if(!s || !s.turns) s={};
+    s.turns=s.turns||seedTurns();
+    s.readings=s.readings||seedReadings();
+    s.checklists=s.checklists||CHECKLISTS;
+    s.checks=s.checks||{};
+    s.photos=s.photos||{};
+    s.financials=s.financials||seedFinancials();
+    s.tasks=s.tasks||seedTasks();
+    s.goals=s.goals||seedGoals();
+    s.alerts=s.alerts||seedAlerts();
+    s.tickets=s.tickets||seedTickets();
+    s.supplies=s.supplies||seedSupplies();
+    s.turns.forEach(turn=>{
+      turn.checkoutTime=turn.checkoutTime||'10:00';
+      turn.readyBy=turn.readyBy||'16:00';
+      turn.checkinTime=turn.checkinTime||'16:00';
+    });
+    localStorage.setItem(STORE_KEY, JSON.stringify(s));
     return s;
   },
   save(s){ localStorage.setItem(STORE_KEY, JSON.stringify(s)); },

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#0F0F10">
-<title>STR Ops — Short Term Retreats</title>
+<title>STR Ops | Short Term Retreats</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,7 @@
     <div id="loginPeople" class="login-people"></div>
     <div id="pinPad" class="pinpad hidden">
       <p id="pinWho" class="pin-who"></p>
-      <div class="pin-dots"><span></span><span></span><span></span><span></span></div>
+      <div class="pin-dots" aria-label="PIN entry progress"></div>
       <div class="pin-grid">
         <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
         <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
@@ -49,10 +49,11 @@
 
   <main id="view" class="view"></main>
 
-  <nav class="tabbar">
+  <nav id="tabbar" class="tabbar">
     <button class="tab active" data-view="today"><span class="tab-ico">&#9737;</span>Today</button>
     <button class="tab" data-view="turns"><span class="tab-ico">&#10003;</span>Turns</button>
     <button class="tab" data-view="water"><span class="tab-ico">&#9832;</span>Water</button>
+    <button class="tab leader-only hidden" data-view="cockpit"><span class="tab-ico">&#9672;</span>Cockpit</button>
     <button class="tab" data-view="team"><span class="tab-ico">&#9776;</span>Team</button>
   </nav>
 </div>
@@ -65,6 +66,7 @@
 <div id="toast" class="toast hidden"></div>
 
 <script src="data.js"></script>
+<script src="api.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

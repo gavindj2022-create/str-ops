@@ -4,6 +4,46 @@
 Everything below is decided. Where something is still open it is marked **ASSUMPTION** with a
 safe default — build the default, do not stop to ask.
 
+## Current test-build checkpoint — 2026-07-27
+
+A runnable v2 local test version now exists on branch `codex/str-ops-v2-test`.
+
+Start it with:
+
+```bash
+npm install
+npm run test-version
+```
+
+Open `http://127.0.0.1:8787`. Test PINs are Gav `135790`, Anna `246810`, Maria `1111`,
+and Jess `2222`.
+
+Completed in this checkpoint:
+
+- Unified Worker plus static-assets runtime, D1 migrations, idempotent demo seed, R2
+  binding, authenticated sessions, rate limiting, role enforcement, audit log, computed
+  alerts, and booking/iCal reconciliation
+- Owner/manager/cleaner role migration
+- Owner cockpit with financials, tasks, alerts, goals, and property snapshots
+- Cleaner claim/start state, turnover windows, issue reporting, water streak, two-day
+  test cadence, and phone-width layout
+- Progressive API adapter with a localStorage fallback for the test/demo experience
+- Authenticated R2 verification-photo upload, server-enforced checklist/photo gate, and
+  invalidation when a photo is deleted or purged
+- Automated backend/frontend tests, positive/negative ready-gate coverage, local Worker
+  integration test, and a 375px browser pass
+
+Still required before production:
+
+- Production D1/R2 resources, real `SESSION_SECRET`, Cloudflare Access, and custom domain
+- Seven Airbnb/Vrbo iCal secrets
+- Actual VAPID Web Push delivery
+- Production R2 retention verification
+- Final real-device authentication and camera acceptance test with the actual team
+
+The sections below remain the product and production contract. Where an older status line
+conflicts with this checkpoint, this checkpoint is authoritative.
+
 ---
 
 ## 0. What this is (30-second version)
@@ -35,21 +75,21 @@ Working v1 demo, verified in-browser. Runs with no build step:
 ```bash
 python -m http.server 8123 --directory public   # then open http://localhost:8123
 ```
-PINs today: Anna 1234, Gav 0000, Maria 1111, Jess 2222.
+Test PINs today: Gav 135790, Anna 246810, Maria 1111, Jess 2222.
 
 - `public/index.html` — app shell + tab bar. `public/styles.css` — the **dark-luxury design
   system** (near-black `#0F0F10`, bone `#F4F1EC`, gold `#C9A46B`, teal `#1F4E5F`, red
   `#D72638`, Fraunces + Inter). **Match this. Do not restyle.**
 - `public/app.js` — all UI + logic. Global state `S = {turns, readings, checks, photos,
   tickets}`. Views switch via `go(view)`; tabs carry `data-view`.
-- `public/data.js` — **the swap point.** Seeds the 4 properties, water assets, checklists,
-  team, and demo turns/readings. `DB.load() / DB.save() / DB.reset()` read/write
-  localStorage today. **Repointing `DB.*` to the Worker API is the core of this build.**
+- `public/data.js` — seeds the four properties, water assets, checklists, team, and complete
+  v2 demo state. Local storage is the non-blocking fallback. `public/api.js` is the camelCase
+  Worker adapter, and mutations progressively sync to the API when it is available.
 - `public/sw.js` — service worker, **network-first** (keep it; a cache-first SW served stale
   code before). Add Web Push handlers here.
-- `worker/index.js` — Cloudflare Worker. Already does iCal sync (`syncAll` on a 30-min cron)
-  + read-only `/api/turns`, `/api/water`, `/api/sync`, `/api/health`. **Extend this into the
-  full CRUD API in §5.**
+- `worker/index.js` plus `worker/*.js` — unified Cloudflare Worker with authenticated CRUD,
+  D1 state, R2 routes, computed alerts, audit history, booking reconciliation, iCal sync,
+  and a 30-minute cron.
 - `schema.sql` — D1 tables, **already extended for v2** (financials, owner_tasks, goals,
   push_subscriptions, supplies, sessions; turns has checkout_time/checkin_time/started_at).
 - `wrangler.toml` — D1 + R2 bindings, cron, secret notes. `.env.example` — every secret.
@@ -200,7 +240,7 @@ VEVENT when present.
 1. Anna/Gale export each listing's `.ics` (Availability → Export Calendar). 7 links total.
    The copy-paste ask is drafted in vault `Projects/STR Website/iCal Setup - Ready for
    Tomorrow.md`.
-2. `wrangler pages secret put ICAL_WESTGATE_AIRBNB --project-name=str-ops` (× all 7).
+2. `wrangler secret put ICAL_WESTGATE_AIRBNB` (repeat for all seven).
 3. Hit `/api/sync` once. Real turns replace the seed turns. **No code change.** The seeder
    in `data.js` intentionally mirrors the feed shape so every screen already works.
 
@@ -222,18 +262,18 @@ VEVENT when present.
 ## 9. Setup, run, deploy
 
 ```bash
-# local dev (Worker + D1 + static)
-npm i -g wrangler
-wrangler d1 create str-ops                 # paste database_id into wrangler.toml
-wrangler d1 execute str-ops --file=schema.sql
-wrangler r2 bucket create str-ops-photos
-cp .env.example .dev.vars                   # fill in VAPID + SESSION_SECRET (iCal optional)
-wrangler pages dev public                   # serves front end + Worker functions
+# local test version (Worker + local D1 + static assets)
+npm install
+npm run test-version
 
 # production
-wrangler pages deploy public --project-name=str-ops
-# set each secret:  wrangler pages secret put <NAME> --project-name=str-ops
-# attach team.shorttermretreats.com in the Pages dashboard; enable Cloudflare Access
+wrangler d1 create str-ops                  # paste database_id into wrangler.toml
+wrangler d1 migrations apply str-ops --remote
+wrangler r2 bucket create str-ops-photos
+wrangler secret put SESSION_SECRET
+# set each iCal/VAPID secret with: wrangler secret put <NAME>
+wrangler deploy
+# attach team.shorttermretreats.com to the Worker; enable Cloudflare Access
 ```
 
 ---

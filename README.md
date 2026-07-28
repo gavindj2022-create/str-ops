@@ -1,44 +1,87 @@
-# STR Ops — Short Term Retreats team app
+# STR Ops
 
 Private, phone-first operations app for the four Short Term Retreats properties.
-Dark-luxury brand skin, big buttons, built so "a fifth grader could use it." Anna (Head
-Operations Manager) is admin.
 
-## Modules (v1)
-- **Turnover board** — per-property cards driven by the Airbnb calendar. Checklist per
-  home (real layouts), verification photos, same-day-turn red flag.
-- **Pool + hot tub log** — two pools + two hot tubs (Westgate + Hickory). Dosing hints,
-  balanced/adjust/needs-care status, next-test-due, one-tap compliance PDF export.
-- **Daily brief** — Today tab: what to clean, who is arriving, which pools need testing.
-- **Team / admin** — auto-assign cleaners (Anna approves), manage the team.
+## Test version status
 
-Wave 1 features live in the demo: auto-assign, photo-verified ready gate, pool compliance log.
-Wave 2/3 (maintenance tickets, supplies, weather-smart care, hours, review link) are
-scaffolded in the schema and roadmap.
+The v2 local test build is runnable. It includes:
 
-## Run locally
-Static front end, no build step:
+- Owner, manager, and cleaner roles
+- Owner cockpit with revenue, net, expenses, cleaner payouts, alerts, tasks, and goals
+- Cleaner assignment and one-tap "I'm on it" status
+- Turnover windows and same-day warnings
+- Checklist and required-photo ready gate
+- Authenticated R2 photo upload with deleted-photo invalidation
+- Cleaner damage/issue reporting
+- Pool and hot-tub logging, two-day cadence, streak, and compliance export
+- Unified Cloudflare Worker, D1 migrations, local seed data, authenticated API, R2 routes,
+  scheduled iCal reconciliation, and role enforcement
+
+Production Web Push delivery, Cloudflare Access, live iCal feeds, production deployment,
+and real-phone camera acceptance are not complete.
+
+## Start the test version
+
+Requirements: Node.js 20 or newer.
+
+```bash
+npm install
+npm run test-version
 ```
-python -m http.server 8123 --directory public
+
+Open `http://127.0.0.1:8787`.
+
+Demo PINs:
+
+| Person | Role | PIN |
+|---|---|---|
+| Gav | Owner | `135790` |
+| Anna | Manager | `246810` |
+| Maria | Cleaner | `1111` |
+| Jess | Cleaner | `2222` |
+
+`npm run test-version` applies local D1 migrations, refreshes the idempotent demo seed, and
+starts the Worker with a test-only session secret. The browser keeps a local fallback copy
+so the interface remains demonstrable if the API is temporarily unavailable.
+
+## Verification
+
+```bash
+npm run test:all
+npx wrangler deploy --dry-run
 ```
-Open http://localhost:8123 . PINs: Anna 1234, Gav 0000, Maria 1111, Jess 2222.
-Data seeds to localStorage; "Reset demo data" is under Team (manager only).
 
-## Going live (Cloudflare)
-The front end currently reads from `data.js` (localStorage). The swap point is `DB.load()`
-/ `DB.save()` → `fetch('/api/...')` against the Worker.
+- `npm test` runs nine backend unit and frontend contract tests.
+- `npm run test:backend` starts a separate local Worker and verifies authentication,
+  role redaction, CRUD, cleaner claim/start, positive and negative checklist/photo ready
+  gates, deleted-photo invalidation, water, and computed alerts.
 
-1. `wrangler d1 create str-ops` → paste `database_id` into `wrangler.toml`.
-2. `wrangler d1 execute str-ops --file=schema.sql`
-3. Set the 7 iCal secrets (same names/URLs as the str-website project):
-   `wrangler pages secret put ICAL_WESTGATE_AIRBNB --project-name=str-ops` (etc).
-   **Blocker:** the `.ics` export URLs must be pulled by Anabelle or Gale — Gav's account
-   is a calendar co-host and can't reach Airbnb's Export Calendar link. See the STR website
-   note `iCal Setup - Ready for Tomorrow.md`.
-4. `wrangler pages deploy public` → attach `team.shorttermretreats.com`.
-5. Cron (every 30 min) refreshes turns from the feeds via `scheduled()`.
+## Local-test boundaries
 
-## Files
-- `public/` — the PWA (index.html, styles.css, data.js, app.js, sw.js, manifest, icon).
-- `worker/index.js` — API + iCal sync (drop-in live backend).
-- `schema.sql` — D1 tables. `wrangler.toml` — bindings + cron.
+- This build uses synthetic data and demo PINs. Offline PIN fallback is limited to
+  loopback/file URLs and must not be used for real operations.
+- Offline mutations are retained on the current device but are not yet queued for later
+  cloud replay.
+- Desktop and 375px phone-viewport browser passes are complete. A real-phone camera pass
+  remains part of production acceptance.
+
+## Architecture
+
+- `public/` - installable PWA and progressive API adapter
+- `worker/` - authenticated Worker API, alerts, auth, iCal, and SQL/DTO adapters
+- `migrations/` - versioned D1 schema
+- `seed/demo.sql` - idempotent local demo data
+- `tests/` - backend unit/integration and frontend contract tests
+- `wrangler.toml` - one Worker serving `/api/*`, static assets, D1, R2, and cron
+- `HANDOFF.md` - product scope, API contract, guardrails, and remaining go-live work
+
+## Production remaining
+
+1. Create the production D1 database and replace the placeholder `database_id`.
+2. Create/bind the production `str-ops-photos` R2 bucket.
+3. Set `SESSION_SECRET` with `wrangler secret put SESSION_SECRET`.
+4. Configure Cloudflare Access and the team email allowlist.
+5. Add the seven Airbnb/Vrbo iCal secrets from Anabelle or Gale.
+6. Implement and verify VAPID Web Push delivery.
+7. Deploy with `npm run deploy`, attach `team.shorttermretreats.com`, and run real-phone
+   authentication, camera, and acceptance testing.

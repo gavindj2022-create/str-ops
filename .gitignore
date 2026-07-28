@@ -6,6 +6,7 @@
 
 # Cloudflare / wrangler
 .wrangler/
+.wrangler-dry-run/
 .mf/
 dist/
 
