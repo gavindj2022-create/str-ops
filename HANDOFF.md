@@ -28,6 +28,8 @@ Completed in this checkpoint:
 - Ops cockpit with financials, tasks, alerts, goals, and property snapshots
 - Team claim/start state, turnover windows, issue reporting, safe-water streak, two-day
   test cadence, property emojis/colors, and phone-width layout
+- Per-house role lanes for Clean, Laundry, Water, Inspect, Supplies, and Maintenance.
+  Current seed example: Millpoint Clean = Gav and Millpoint Laundry = Gale.
 - Progressive API adapter with a localStorage fallback for the test/demo experience
 - Authenticated R2 verification-photo upload, server-enforced checklist/photo gate, and
   invalidation when a photo is deleted or purged
@@ -99,8 +101,8 @@ Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Ana 864210.
 
 Features already built in the demo: local name-tap login, turnover board (iCal-shaped),
 per-property checklists that can be checked and unchecked, photo-verified ready gate,
-auto-assign team members, Photo Test Log for pool/hot-tub kit photos, care hints + status,
-compliance export, same-day-turn red flag, and Ana's copyable daily brief.
+auto-assign team members, house role lanes, Photo Test Log for pool/hot-tub kit photos,
+care hints + status, compliance export, same-day-turn red flag, and Ana's copyable daily brief.
 
 ---
 
@@ -113,6 +115,7 @@ compliance export, same-day-turn red flag, and Ana's copyable daily brief.
 | Roles | `dev` (Gav), `owner` (Gale and Ana), `manager` (Larry), `cleaner` for future outside cleaners. See §3. |
 | Cockpit access | Dev, owner, and house manager see the cockpit. Tasks/schedule/alerts/goals are shared. |
 | Team roster | Seed the actual test roster: Gav, Gale, Larry, Ana. Maria and Jess are stale demo users and should stay inactive. |
+| House roles | Hybrid default: each property has role lanes (`clean`, `laundry`, `water`, `inspect`, `supplies`, `maintenance`); Ana can still override turn owner/ops tasks. |
 | Worker visibility | ASSUMPTION: workers see **all** turns (matches v1). Assigned turns are highlighted. |
 | Money source | ASSUMPTION: **manual entry** per property/month in the cockpit; occupancy is **derived** from turns/feed. Wire a "pull from feed × nightly rate" helper but do not depend on it. |
 | Pool test cadence | ASSUMPTION: **due every 2 days**; overdue → alerts feed. Make the interval a constant that's easy to change. |

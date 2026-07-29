@@ -10,6 +10,7 @@ The v2 local test build is runnable. It includes:
 - Ops cockpit with revenue, net, expenses, worker payouts, alerts, tasks, and goals
 - Ana owner-organizer tools for auto-assigning open turns and copying a daily crew brief
 - Team assignment and one-tap "Claim + Start" status
+- Per-house role lanes for Clean, Laundry, Water, Inspect, Supplies, and Maintenance
 - Turnover windows and same-day warnings
 - Checklist items that can be checked and unchecked, plus a required-photo ready gate
 - Authenticated R2 photo upload with deleted-photo invalidation

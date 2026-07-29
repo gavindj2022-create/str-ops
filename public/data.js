@@ -23,45 +23,62 @@ const WATER_ASSETS = [
   { id:'hickory-tub',   propertyId:'hickory',  type:'hottub', name:'Cabana hot tub' },
 ];
 
-/* checklist item: {label, group, photo:false|'optional'|'required'} */
+const WORK_ROLES = [
+  { id:'clean', label:'Clean', emoji:'🧽' },
+  { id:'laundry', label:'Laundry', emoji:'🧺' },
+  { id:'water', label:'Water', emoji:'💧' },
+  { id:'inspect', label:'Inspect', emoji:'✅' },
+  { id:'supplies', label:'Supplies', emoji:'📦' },
+  { id:'maintenance', label:'Maintenance', emoji:'🔧' },
+];
+
+const HOUSE_ROLES = {
+  millpoint: { clean:['gav'], laundry:['gale'], inspect:['anna'], supplies:['gale'], maintenance:['larry'] },
+  westgate:  { clean:['anna'], laundry:['gale'], water:['anna'], inspect:['anna'], supplies:['gale'], maintenance:['larry'] },
+  galena:    { clean:['gav'], laundry:['gale'], inspect:['anna'], supplies:['gale'], maintenance:['larry'] },
+  hickory:   { clean:['larry'], laundry:['gale'], water:['larry'], inspect:['anna'], supplies:['larry'], maintenance:['larry'] },
+};
+
+/* checklist item: {label, group, role, photo:false|'optional'|'required'} */
 function baseHome(extra){
   return [
-    { group:'Bedrooms', label:'Strip and remake all beds', photo:'required' },
-    { group:'Bedrooms', label:'Fresh linens and pillowcases', photo:false },
-    { group:'Bathrooms', label:'Scrub and disinfect bathrooms', photo:'required' },
-    { group:'Bathrooms', label:'Restock towels, paper, toiletries', photo:false },
-    { group:'Kitchen', label:'Wash dishes, wipe counters, empty fridge', photo:false },
-    { group:'Kitchen', label:'Restock coffee, supplies, trash bags', photo:false },
-    { group:'Living', label:'Vacuum and mop all floors', photo:false },
-    { group:'Living', label:'Reset furniture and staging', photo:'optional' },
+    { group:'Bedrooms', role:'clean', label:'Strip and remake all beds', photo:'required' },
+    { group:'Bedrooms', role:'clean', label:'Fresh linens and pillowcases', photo:false },
+    { group:'Laundry', role:'laundry', label:'Bag used linens and towels for laundry', photo:false },
+    { group:'Bathrooms', role:'clean', label:'Scrub and disinfect bathrooms', photo:'required' },
+    { group:'Bathrooms', role:'supplies', label:'Restock towels, paper, toiletries', photo:false },
+    { group:'Kitchen', role:'clean', label:'Wash dishes, wipe counters, empty fridge', photo:false },
+    { group:'Kitchen', role:'supplies', label:'Restock coffee, supplies, trash bags', photo:false },
+    { group:'Living', role:'clean', label:'Vacuum and mop all floors', photo:false },
+    { group:'Living', role:'clean', label:'Reset furniture and staging', photo:'optional' },
     ...extra,
-    { group:'Finish', label:'Take out all trash', photo:false },
-    { group:'Finish', label:'Final walkthrough photo', photo:'required' },
+    { group:'Finish', role:'clean', label:'Take out all trash', photo:false },
+    { group:'Finish', role:'inspect', label:'Final walkthrough photo', photo:'required' },
   ];
 }
 const CHECKLISTS = {
   westgate: baseHome([
-    { group:'Group setup', label:'Reset dining for 12, wipe table + chairs', photo:false },
-    { group:'Pool', label:'Skim pool, empty baskets, tidy loungers', photo:'required' },
-    { group:'Pool', label:'Log pool chemistry (see Water tab)', photo:false },
-    { group:'Hot tub', label:'Wipe hot tub + 4-season room, log chemistry', photo:'required' },
-    { group:'Outdoor', label:'Clean BBQ grill + patio, pick up fenced yard', photo:false },
+    { group:'Group setup', role:'clean', label:'Reset dining for 12, wipe table + chairs', photo:false },
+    { group:'Pool', role:'water', label:'Skim pool, empty baskets, tidy loungers', photo:'required' },
+    { group:'Pool', role:'water', label:'Log pool chemistry (see Water tab)', photo:false },
+    { group:'Hot tub', role:'water', label:'Wipe hot tub + 4-season room, log chemistry', photo:'required' },
+    { group:'Outdoor', role:'clean', label:'Clean BBQ grill + patio, pick up fenced yard', photo:false },
   ]),
   hickory: baseHome([
-    { group:'Suites', label:'Reset both king suites', photo:'optional' },
-    { group:'Levels', label:'Vacuum all levels + stairs', photo:false },
-    { group:'Pool', label:'Skim pool, empty baskets, log chemistry', photo:'required' },
-    { group:'Hot tub', label:'Wipe cabana hot tub, log chemistry', photo:'required' },
+    { group:'Suites', role:'clean', label:'Reset both king suites', photo:'optional' },
+    { group:'Levels', role:'clean', label:'Vacuum all levels + stairs', photo:false },
+    { group:'Pool', role:'water', label:'Skim pool, empty baskets, log chemistry', photo:'required' },
+    { group:'Hot tub', role:'water', label:'Wipe cabana hot tub, log chemistry', photo:'required' },
   ]),
   millpoint: baseHome([
-    { group:'Windows', label:'Clean floor-to-ceiling lake windows', photo:false },
-    { group:'Waterfront', label:'Rinse and store kayaks', photo:false },
-    { group:'Waterfront', label:'Empty bonfire pit ash, tidy boat ramp area', photo:'optional' },
+    { group:'Windows', role:'clean', label:'Clean floor-to-ceiling lake windows', photo:false },
+    { group:'Waterfront', role:'clean', label:'Rinse and store kayaks', photo:false },
+    { group:'Waterfront', role:'clean', label:'Empty bonfire pit ash, tidy boat ramp area', photo:'optional' },
   ]),
   galena: baseHome([
-    { group:'Arcade', label:'Wipe Golden Tee, ping-pong, darts area', photo:false },
-    { group:'Beach', label:'Rinse and store kayaks, tidy beach area', photo:false },
-    { group:'Bedroom', label:'Reset canopy king bed', photo:'optional' },
+    { group:'Arcade', role:'clean', label:'Wipe Golden Tee, ping-pong, darts area', photo:false },
+    { group:'Beach', role:'clean', label:'Rinse and store kayaks, tidy beach area', photo:false },
+    { group:'Bedroom', role:'clean', label:'Reset canopy king bed', photo:'optional' },
   ]),
 };
 
@@ -146,6 +163,7 @@ const DB = {
     s.turns=s.turns||seedTurns();
     s.readings=s.readings||seedReadings();
     s.checklists=s.checklists||CHECKLISTS;
+    s.roleMap=s.roleMap||HOUSE_ROLES;
     s.checks=s.checks||{};
     s.photos=s.photos||{};
     s.financials=s.financials||seedFinancials();

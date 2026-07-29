@@ -126,6 +126,8 @@ try {
   assert.equal(managerState.response.status, 200);
   assert.equal(managerState.payload.schemaVersion, 2);
   assert.ok(managerState.payload.turns.length >= 5);
+  assert.ok(managerState.payload.checklists.millpoint.some(item => item.role === 'laundry'));
+  assert.ok(managerState.payload.checklists.westgate.some(item => item.role === 'water'));
   const chicagoToday = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Chicago',
     year: 'numeric',
@@ -282,7 +284,8 @@ try {
   assert.equal(verifiedCheck.response.status, 200);
   assert.equal(verifiedCheck.payload.photoKey, uploadedPhoto.payload.key);
 
-  for (const itemIdx of [1, 2, 3, 4]) {
+  const hickoryTemplate = cleanerState.payload.checklists.hickory;
+  for (const itemIdx of Array.from({ length: hickoryTemplate.length - 1 }, (_, offset) => offset + 1)) {
     const completedCheck = await api(`/api/turns/demo-turn-hickory/checks/${itemIdx}`, {
       method: 'PUT',
       cookie: cleanerCookie,

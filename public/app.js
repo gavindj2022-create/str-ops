@@ -22,6 +22,59 @@ const assignableWorkers=()=>TEAM.filter(person=>person.canWork!==false&&person.i
 const photoSrc=key=>key&&(API.photoUrl?API.photoUrl(key):`/api/photos/${String(key).split('/').map(encodeURIComponent).join('/')}`);
 const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const HEAD_TINT={millpoint:'#1F4E5F',westgate:'#6b4f8a',galena:'#8a6b4f',hickory:'#2E6E82'};
+const GROUP_ROLE={laundry:'laundry',pool:'water','hot tub':'water',finish:'inspect',supplies:'supplies',maintenance:'maintenance'};
+
+function roleMap(){ return S.roleMap||HOUSE_ROLES||{}; }
+function roleDef(id){ return WORK_ROLES.find(role=>role.id===id)||{id,label:id||'Work',emoji:'•'}; }
+function itemRole(item){
+  if(item?.role) return item.role;
+  const group=String(item?.group||'').toLowerCase();
+  const label=String(item?.label||'').toLowerCase();
+  if(group.includes('laundry')||label.includes('linen')||label.includes('towel')) return 'laundry';
+  if(group.includes('pool')||group.includes('hot tub')||label.includes('chemistry')) return 'water';
+  if(group.includes('finish')||label.includes('walkthrough')) return 'inspect';
+  if(label.includes('restock')||label.includes('suppl')) return 'supplies';
+  if(group.includes('maintenance')) return 'maintenance';
+  return GROUP_ROLE[group]||'clean';
+}
+function roleIdsForProperty(propertyId){
+  return Object.keys(roleMap()[propertyId]||{}).filter(role=>(roleMap()[propertyId][role]||[]).length);
+}
+function roleMembers(propertyId,role){
+  const ids=roleMap()[propertyId]?.[role]||[];
+  return ids.map(member).filter(Boolean);
+}
+function roleNames(propertyId,role){
+  const people=roleMembers(propertyId,role);
+  return people.length?people.map(person=>person.name).join(', '):'Unassigned';
+}
+function userRolesForProperty(propertyId,userId=USER?.id){
+  if(!userId) return [];
+  return roleIdsForProperty(propertyId).filter(role=>(roleMap()[propertyId]?.[role]||[]).includes(userId));
+}
+function userHasRoleForProperty(propertyId,userId=USER?.id){ return userRolesForProperty(propertyId,userId).length>0; }
+function roleChip(propertyId,role,{mine=false}={}){
+  const def=roleDef(role);
+  return `<span class="role-chip ${mine?'mine':''}">${def.emoji} ${esc(def.label)} <i>${esc(roleNames(propertyId,role))}</i></span>`;
+}
+function roleSummary(propertyId,{limit=4,onlyMine=false}={}){
+  let roles=roleIdsForProperty(propertyId);
+  if(onlyMine) roles=roles.filter(role=>(roleMap()[propertyId]?.[role]||[]).includes(USER?.id));
+  return roles.slice(0,limit).map(role=>roleChip(propertyId,role,{mine:userRolesForProperty(propertyId).includes(role)})).join('');
+}
+function myLaneText(propertyId){
+  const roles=userRolesForProperty(propertyId);
+  if(!roles.length) return '';
+  return roles.map(role=>`${roleDef(role).emoji} ${roleDef(role).label}`).join(' + ');
+}
+function roleCandidatePeople(propertyId){
+  const ids=new Set([...assignableWorkers().map(person=>person.id)]);
+  Object.values(roleMap()[propertyId]||{}).flat().forEach(id=>ids.add(id));
+  return TEAM.filter(person=>ids.has(person.id));
+}
+function defaultTurnOwner(turn){
+  return roleMembers(turn.propertyId,'clean')[0]||roleCandidatePeople(turn.propertyId)[0]||assignableWorkers()[0]||null;
+}
 
 function todayISO(){ return iso(new Date()); }
 function fmtDay(value){
@@ -75,6 +128,7 @@ function mergeRemoteState(remote){
   collections.forEach(key=>{
     if(state[key]!==undefined&&(Array.isArray(state[key])||['checklists','checks','photos'].includes(key))) S[key]=state[key];
   });
+  S.roleMap=S.roleMap||HOUSE_ROLES;
   S.turns=(S.turns||[]).map(turn=>({
     checkoutTime:'10:00',readyBy:'16:00',checkinTime:'16:00',...turn,
   }));
@@ -218,8 +272,9 @@ function visibleTurns(){
   const turns=[...(S.turns||[])].sort((a,b)=>(a.checkout||'9999').localeCompare(b.checkout||'9999')||(Number(isSameDay(b))-Number(isSameDay(a))));
   if(isLeader()) return turns;
   const mine=turns.filter(turn=>turn.assigned===USER.id);
+  const roleTurns=turns.filter(turn=>turn.status!=='done'&&userHasRoleForProperty(turn.propertyId));
   const available=turns.filter(turn=>!turn.assigned&&turn.status!=='done');
-  return [...mine,...available];
+  return [...new Map([...mine,...roleTurns,...available].map(turn=>[turn.id,turn])).values()];
 }
 
 /* ---------------- Today and turns ---------------- */
@@ -229,8 +284,9 @@ function renderToday(){
   const arriving=S.turns.filter(turn=>turn.checkin===today);
   const testsDue=WATER_ASSETS.filter(asset=>testDue(asset).due);
   const mine=toClean.filter(turn=>turn.assigned===USER.id);
+  const roleTurns=toClean.filter(turn=>userHasRoleForProperty(turn.propertyId));
   const available=toClean.filter(turn=>!turn.assigned);
-  const list=isLeader()?toClean:[...mine,...available];
+  const list=isLeader()?toClean:[...new Map([...mine,...roleTurns,...available].map(turn=>[turn.id,turn])).values()];
   let html=`<div class="stat-row">
     <div class="stat clean"><div class="n">${toClean.length}</div><div class="l">Clean today</div></div>
     <div class="stat arrive"><div class="n">${arriving.length}</div><div class="l">Guests today</div></div>
@@ -242,6 +298,11 @@ function renderToday(){
       <span><b>${urgent} urgent signal${urgent===1?'':'s'}</b><small>${S.tasks.filter(task=>task.status!=='done').length} open tasks · ${S.tickets.filter(ticket=>ticket.status==='open').length} open ticket</small></span>
       <span>Open cockpit</span>
     </button>`;
+  }
+  const laneRows=PROPERTIES.map(property=>({property,roles:userRolesForProperty(property.id)})).filter(row=>row.roles.length);
+  if(laneRows.length){
+    html+=`<div class="lane-card"><div><b>Your house lanes</b><small>Default roles for each house. Ana can still override individual turns.</small></div>
+      <div class="lane-list">${laneRows.map(row=>`<span>${propertyEmoji(row.property.id)} ${esc(row.property.name)}: ${row.roles.map(role=>`${roleDef(role).emoji} ${esc(roleDef(role).label)}`).join(' + ')}</span>`).join('')}</div></div>`;
   }
   html+=`<p class="sec-label">${isLeader()?'Turnovers today':'Your work today'}</p>`;
   html+=list.length?list.map(turnCard).join(''):`<div class="empty"><span class="em-ico">&#9749;</span>Nothing needs you right now.</div>`;
@@ -271,6 +332,8 @@ function turnCard(turn){
   else if(turn.status==='in_progress'){ pill='progress'; pillText='In progress'; }
   const assigned=member(turn.assigned);
   const who=assigned?.name||(turn.assigned?'Assigned team member':'Unassigned');
+  const lane=myLaneText(turn.propertyId);
+  const roles=roleSummary(turn.propertyId,{limit:4});
   const canWork=turn.status!=='done'&&(!turn.assigned||turn.assigned===USER.id||isLeader());
   const action=canWork?`
     <div class="quick-actions">
@@ -285,6 +348,8 @@ function turnCard(turn){
       <div class="card-copy"><span class="pill ${pill}">${pillText}</span>
         <div class="cb-meta">Out ${fmtDay(turn.checkout)} ${fmtTime(turn.checkoutTime)} · ${esc(who)}</div>
         <div class="turn-window">${sameDay?'Tight window':'Ready window'}: ${fmtTime(turn.checkoutTime)}–${fmtTime(turn.readyBy)}${turn.checkin?` · guests ${fmtDay(turn.checkin)} ${fmtTime(turn.checkinTime)}`:''}</div>
+        ${lane?`<div class="lane-line">Your lane: ${esc(lane)}</div>`:''}
+        <div class="role-strip">${roles}</div>
       </div>
       <div class="cb-right"><div class="ring" style="--p:${percent}%"><i>${done}/${total}</i></div><div class="sm">items</div></div>
     </div>${action}</article>`;
@@ -298,10 +363,12 @@ function openTurn(id){
   const list=checklistFor(turn);
   const checks=turnChecks(turn);
   const photos=turnPhotos(turn);
-  const groups=[...new Set(list.map(item=>item.group))];
+  const groupHasMyLane=group=>list.some(item=>item.group===group&&userRolesForProperty(turn.propertyId).includes(itemRole(item)));
+  const groups=[...new Set(list.map(item=>item.group))].sort((a,b)=>Number(groupHasMyLane(b))-Number(groupHasMyLane(a)));
   let body=`<div class="sheet-grab"></div><div class="sheet-title">${esc(property.name)}</div>
     <div class="sheet-sub">${propertyEmoji(turn.propertyId)} Cleaning window ${fmtTime(turn.checkoutTime)}–${fmtTime(turn.readyBy)}${turn.checkin?` · guest in ${fmtDay(turn.checkin)} at ${fmtTime(turn.checkinTime)}`:''}</div>
-    <div class="plain-note"><b>Claim + Start</b> means this turn becomes yours, the status changes to In progress, and Ana can see you started.</div>
+    <div class="plain-note"><b>House roles</b> split the work by lane. <b>Claim + Start</b> still marks the overall turn as started so Ana can see progress.</div>
+    <div class="role-map-card"><b>House role map</b><div class="role-strip">${roleSummary(turn.propertyId,{limit:8})}</div></div>
     <div class="sheet-action-row">
       ${!turn.assigned&&turn.status!=='done'?`<button class="btn primary" data-claim="${turn.id}">Claim + Start</button>`:''}
       <button class="btn ghost" data-report="${turn.id}">Report issue</button>
@@ -314,14 +381,21 @@ function openTurn(id){
       <button class="assign-chip" data-assign="${turn.id}">${turn.assigned?'Reassign':'Assign'}</button></div>`;
   }
   groups.forEach(group=>{
-    body+=`<div class="chk-group-label">${esc(group)}</div>`;
+    const groupRole=itemRole(list.find(item=>item.group===group));
+    const def=roleDef(groupRole);
+    const myLane=userRolesForProperty(turn.propertyId).includes(groupRole);
+    body+=`<div class="chk-group-label ${myLane?'mine':''}"><span>${esc(group)}</span><small>${def.emoji} ${esc(def.label)} · ${esc(roleNames(turn.propertyId,groupRole))}</small></div>`;
     list.forEach((item,index)=>{
       if(item.group!==group) return;
       const on=Boolean(checks[index]);
       const hasPhoto=Boolean(photos[index]);
+      const role=itemRole(item);
+      const def=roleDef(role);
+      const myItem=userRolesForProperty(turn.propertyId).includes(role);
+      const helper=`${myItem?'Your lane · ':''}${def.emoji} ${def.label}: ${roleNames(turn.propertyId,role)} · ${on?'Tap again to undo':'Tap when finished'}`;
       const camera=item.photo?`<button class="cam ${hasPhoto?'has':item.photo==='required'?'req':''}" data-photo="${turn.id}:${index}" aria-label="Add photo">${hasPhoto?'&#10003;':'&#128247;'}</button>`:'';
-      body+=`<div class="chk ${on?'on':''}" data-check="${turn.id}:${index}">
-        <span class="box">&#10003;</span><span class="lbl"><span class="chk-text">${esc(item.label)}</span><small>${on?'Tap again to undo':'Tap when finished'}</small></span>${camera}</div>`;
+      body+=`<div class="chk ${on?'on':''} ${myItem?'mine':'other-lane'}" data-check="${turn.id}:${index}">
+        <span class="box">&#10003;</span><span class="lbl"><span class="chk-text">${esc(item.label)}</span><small>${esc(helper)}</small></span>${camera}</div>`;
     });
   });
   const gate=readyGate(turn);
@@ -775,6 +849,11 @@ function renderTeam(){
   html+=TEAM.map(person=>`<div class="row"><span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
     <div><div class="rn">${esc(person.name)}</div><div class="rr">${esc(displayRole(person))}${person.id==='anna'?' - assigns, organizes, and sends the day':person.role==='dev'?' - app build + crew':person.role==='owner'?' - owner':person.role==='manager'?' - house operations':''}</div></div>
     <span class="badge ${person.role!=='cleaner'?'admin':''}">${esc(displayRole(person))}</span></div>`).join('');
+  html+=`<p class="sec-label">House role map</p>
+    <div class="role-board">${PROPERTIES.map(property=>`<div class="role-house">
+      <div class="role-house-head"><span>${propertyEmoji(property.id)}</span><b>${esc(property.name)}</b></div>
+      <div class="role-strip">${roleSummary(property.id,{limit:8})}</div>
+    </div>`).join('')}</div>`;
   if(isLeader()){
     html+=`<p class="sec-label">Organizer tools</p>
       <button class="btn ghost" data-autoassign>&#9851; Auto-assign open turns</button>
@@ -793,27 +872,28 @@ function autoAssignAll(){
   const patches=[];
   commit(()=>{
     S.turns.filter(turn=>turn.status!=='done'&&!turn.assigned).forEach(turn=>{
-      const choice=[...workers].sort((a,b)=>load[a.id]-load[b.id])[0];
+      const defaultOwner=defaultTurnOwner(turn);
+      const choice=defaultOwner||[...workers].sort((a,b)=>load[a.id]-load[b.id])[0];
       turn.assigned=choice.id;
-      load[choice.id]+=1;
+      load[choice.id]=(load[choice.id]||0)+1;
       patches.push({id:turn.id,assigned:choice.id});
     });
   },()=>Promise.all(patches.map(patch=>API.patchTurn(patch.id,{assigned:patch.assigned}))));
-  toast('Open turns assigned to the team');
+  toast('Open turns assigned from house roles');
 }
 function openAssign(turnId){
   const turn=S.turns.find(item=>item.id===turnId);
   if(!turn) return;
-  const cleaners=assignableWorkers();
+  const cleaners=roleCandidatePeople(turn.propertyId);
   if(!cleaners.length){ toast('No assignable team members yet'); return; }
   const load=id=>S.turns.filter(item=>item.assigned===id&&item.status!=='done').length;
-  const suggested=[...cleaners].sort((a,b)=>load(a.id)-load(b.id))[0];
+  const suggested=defaultTurnOwner(turn)||[...cleaners].sort((a,b)=>load(a.id)-load(b.id))[0];
   openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Assign team member</div>
     <div class="sheet-sub">${esc(prop(turn.propertyId).name)} · ${fmtDay(turn.checkout)}</div>
-    <div class="gate-note water-note"><span>&#9851;</span><span>Suggested: <b>${esc(suggested.name)}</b>, with the fewest open turns.</span></div>
+    <div class="gate-note water-note"><span>&#9851;</span><span>Suggested: <b>${esc(suggested.name)}</b>, based on this house's Clean lane. The role map still shows everyone's separate lane.</span></div>
     <div class="pick-list">${cleaners.map(cleaner=>`<button data-pick="${turn.id}:${cleaner.id}" class="${cleaner.id===suggested.id?'sel':''}">
       <span class="pa" style="background:${cleaner.color}">${esc(cleaner.name[0])}</span>
-      <span>${esc(cleaner.name)}<div class="mini">${load(cleaner.id)} open turn${load(cleaner.id)===1?'':'s'}</div></span></button>`).join('')}</div>`);
+      <span>${esc(cleaner.name)}<div class="mini">${userRolesForProperty(turn.propertyId,cleaner.id).map(role=>roleDef(role).label).join(', ')||'Manual override'} · ${load(cleaner.id)} open turn${load(cleaner.id)===1?'':'s'}</div></span></button>`).join('')}</div>`);
 }
 function pickCleaner(turnId,cleanerId){
   const turn=S.turns.find(item=>item.id===turnId);
@@ -832,7 +912,7 @@ function dailyBriefText(){
     `STR Ops brief for ${new Date().toLocaleDateString('en-US',{timeZone:'America/Chicago',weekday:'long',month:'short',day:'numeric'})}`,
     '',
     'Turns',
-    ...(active.length?active.map(turn=>`${propertyEmoji(turn.propertyId)} ${prop(turn.propertyId).name}: ${member(turn.assigned)?.name||'Unassigned'} (${turn.status.replace('_',' ')})`) : ['No turns due today.']),
+    ...(active.length?active.map(turn=>`${propertyEmoji(turn.propertyId)} ${prop(turn.propertyId).name}: ${member(turn.assigned)?.name||'Unassigned'} (${turn.status.replace('_',' ')}) · ${roleIdsForProperty(turn.propertyId).map(role=>`${roleDef(role).label}: ${roleNames(turn.propertyId,role)}`).join(' · ')}`) : ['No turns due today.']),
     '',
     'Water',
     ...(waterDue.length?waterDue.map(asset=>`${propertyEmoji(asset.propertyId)} ${prop(asset.propertyId).name} ${asset.name}: due now`) : ['Water is current.']),

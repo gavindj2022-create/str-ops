@@ -17,8 +17,8 @@ test('demo state uses canonical camelCase shape and corrected team roles',async(
     },
     Intl,Date,console,
   });
-  vm.runInContext(`${source}\nglobalThis.__demo={TEAM,DB,iso};`,context);
-  const {TEAM,DB,iso}=context.__demo;
+  vm.runInContext(`${source}\nglobalThis.__demo={TEAM,DB,iso,HOUSE_ROLES,WORK_ROLES,CHECKLISTS};`,context);
+  const {TEAM,DB,iso,HOUSE_ROLES,WORK_ROLES,CHECKLISTS}=context.__demo;
   const state=DB.load();
   assert.deepEqual(Array.from(TEAM,item=>item.role),['dev','owner','manager','owner']);
   assert.equal(TEAM.find(item=>item.id==='gav').pin.length,6);
@@ -26,6 +26,11 @@ test('demo state uses canonical camelCase shape and corrected team roles',async(
   assert.equal(TEAM.find(item=>item.id==='larry').pin.length,6);
   assert.equal(TEAM.find(item=>item.id==='anna').name,'Ana');
   assert.equal(TEAM.find(item=>item.id==='anna').role,'owner');
+  assert.equal(WORK_ROLES.some(role=>role.id==='laundry'),true);
+  assert.deepEqual(Array.from(HOUSE_ROLES.millpoint.clean),['gav']);
+  assert.deepEqual(Array.from(HOUSE_ROLES.millpoint.laundry),['gale']);
+  assert.equal(state.roleMap.millpoint.clean[0],'gav');
+  assert.ok(CHECKLISTS.millpoint.some(item=>item.role==='laundry'));
   for(const key of ['turns','readings','financials','tasks','goals','alerts','tickets','supplies']){
     assert.ok(Array.isArray(state[key]),`${key} should be seeded`);
   }
@@ -74,8 +79,8 @@ test('API adapter targets the documented camelCase endpoints',async()=>{
 });
 
 test('UI contract includes gated cockpit and core phone actions',async()=>{
-  const [html,app,css]=await Promise.all([
-    read('public/index.html'),read('public/app.js'),read('public/styles.css'),
+  const [html,app,css,data]=await Promise.all([
+    read('public/index.html'),read('public/app.js'),read('public/styles.css'),read('public/data.js'),
   ]);
   assert.match(html,/data-view="cockpit"/);
   assert.match(html,/leader-only hidden/);
@@ -87,9 +92,10 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   assert.match(app,/startedAt:true/);
   assert.match(app,/Cloud sync failed/);
   assert.ok(!app.includes('Test'+' PIN'),'login cards should not show demo credentials');
-  for(const phrase of ['Claim + Start','Photo Test Log',"Copy today's brief",'Done · ready for guest','Report damage or issue','safe water streak','Ops cockpit']){
+  for(const phrase of ['Claim + Start','Photo Test Log',"Copy today's brief",'Done · ready for guest','Report damage or issue','safe water streak','Ops cockpit','House role map','Your lane']){
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
+  assert.ok(data.includes('Laundry'),'missing Laundry role seed');
   assert.match(css,/@media \(max-width:390px\)/);
   assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });
