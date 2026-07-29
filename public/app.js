@@ -150,7 +150,10 @@ function renderLogin(){
 }
 let pinTarget=null;
 let pinBuf='';
-const isLocalDemo=()=>['localhost','127.0.0.1'].includes(location.hostname)||location.protocol==='file:';
+const isPrivateLanHost=host=>/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)
+  || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
+  || /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host);
+const isLocalDemo=()=>['localhost','127.0.0.1'].includes(location.hostname)||isPrivateLanHost(location.hostname)||location.protocol==='file:';
 async function attemptLogin(person,attempted,{showChecking=false,showErrors=false,quick=false}={}){
   if(showChecking) $('#pinError').textContent='Checking PIN…';
   try{

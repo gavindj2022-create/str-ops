@@ -88,6 +88,7 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   assert.match(app,/repeat\(person\.pin\.length\)/);
   assert.match(app,/pinTarget\?\.pin\?\.length\|\|4/);
   assert.match(app,/isLocalDemo\(\)/);
+  assert.match(app,/isPrivateLanHost\(location\.hostname\)/);
   assert.match(app,/attemptLogin\(person,person\.pin,\{quick:true\}\)/);
   assert.match(app,/startedAt:true/);
   assert.match(app,/Cloud sync failed/);
