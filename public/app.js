@@ -1259,6 +1259,231 @@ async function copyDailyBrief(){
   }
 }
 
+/* ---------------- Simple UI overrides ---------------- */
+function simpleTurnStatus(turn){
+  if(['ready','done'].includes(turn.status)) return {className:'ready',label:'Ready'};
+  if(turn.status==='in_progress') return {className:'progress',label:'Started'};
+  if(isSameDay(turn)) return {className:'sameday',label:'Today'};
+  return {className:'needs',label:'Needs work'};
+}
+function simpleWaterReasons(asset,reading){
+  if(!reading) return ['Not checked yet'];
+  const tips=doseAdvice(asset.type,reading);
+  if(tips.length) return tips.slice(0,2);
+  if(testDue(asset).due) return ['Time to check again'];
+  return ['Looks good'];
+}
+function renderToday(){
+  const today=todayISO();
+  const toClean=S.turns.filter(turn=>turn.checkout&&turn.checkout<=today&&turn.status!=='done');
+  const arriving=S.turns.filter(turn=>turn.checkin===today);
+  const testsDue=WATER_ASSETS.filter(asset=>testDue(asset).due);
+  const mine=toClean.filter(turn=>turn.assigned===USER.id);
+  const roleTurns=toClean.filter(turn=>userHasRoleForProperty(turn.propertyId));
+  const available=toClean.filter(turn=>!turn.assigned);
+  const list=isLeader()?toClean:[...new Map([...mine,...roleTurns,...available].map(turn=>[turn.id,turn])).values()];
+  const urgent=S.alerts.filter(alert=>!alert.resolved&&alert.severity==='urgent').length;
+  let html=`<div class="simple-hero"><span class="eyebrow">Today</span><h1>What needs doing?</h1>
+    <div class="simple-chip-row">
+      <span class="simple-chip">${toClean.length} clean</span>
+      <span class="simple-chip">${arriving.length} guests</span>
+      <span class="simple-chip ${testsDue.length?'warn':''}">${testsDue.length} water</span>
+    </div></div>`;
+  if(isLeader()&&urgent){
+    html+=`<button class="simple-alert" data-open-cockpit><b>${urgent} things need help</b><small>Open Ana board</small></button>`;
+  }
+  html+=`<p class="sec-label">${isLeader()?'Houses today':'Your jobs today'}</p>`;
+  html+=list.length?list.map(turnCard).join(''):`<div class="empty"><span class="em-ico">&#9749;</span>No house work right now.</div>`;
+  if(testsDue.length){
+    html+=`<p class="sec-label">Water</p>`;
+    html+=testsDue.map(asset=>`<div class="simple-card water-simple" data-water="${asset.id}">
+      <div><b>${asset.emoji||propertyEmoji(asset.propertyId)} ${esc(prop(asset.propertyId).name)}</b><small>${esc(asset.name)} needs a check</small></div>
+      <span class="simple-action">Check water</span></div>`).join('');
+  }
+  return html;
+}
+function renderTurns(){
+  const turns=visibleTurns();
+  return `<div class="simple-hero compact"><span class="eyebrow">Houses</span><h1>Pick a house.</h1></div>
+    ${turns.length?turns.map(turnCard).join(''):'<div class="empty">No upcoming turns.</div>'}`;
+}
+function turnCard(turn){
+  const property=prop(turn.propertyId);
+  const {done,total}=turnProgress(turn);
+  const sameDay=isSameDay(turn);
+  const status=simpleTurnStatus(turn);
+  const assigned=member(turn.assigned);
+  const who=assigned?.name||(turn.assigned?'Assigned':'Open');
+  const lane=myLaneText(turn.propertyId);
+  return `<article class="card simple-turn ${sameDay&&turn.status!=='done'?'urgent':''}" data-turn="${turn.id}">
+    <div class="card-head" style="background-color:${propertyColor(turn.propertyId)}">
+      <span class="home-badge">${propertyEmoji(turn.propertyId)}</span><span class="ch-name">${esc(property.name)}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-copy"><span class="pill ${status.className}">${status.label}</span>
+        <div class="cb-meta">${fmtDay(turn.checkout)} · ${esc(who)}</div>
+        ${lane?`<div class="lane-line">Your job: ${esc(lane)}</div>`:''}
+      </div>
+      <div class="cb-right"><div class="ring" style="--p:${total?Math.round(done/total*100):0}%"><i>${done}/${total}</i></div><div class="sm">done</div></div>
+    </div>
+    <div class="one-button-row"><button class="btn primary small-btn">Open job</button></div>
+  </article>`;
+}
+function openTurn(id){
+  const turn=S.turns.find(item=>item.id===id);
+  if(!turn) return;
+  const property=prop(turn.propertyId);
+  const list=checklistFor(turn);
+  const checks=turnChecks(turn);
+  const photos=turnPhotos(turn);
+  const groupHasMyLane=group=>list.some(item=>item.group===group&&userRolesForProperty(turn.propertyId).includes(itemRole(item)));
+  const groups=[...new Set(list.map(item=>item.group))].sort((a,b)=>Number(groupHasMyLane(b))-Number(groupHasMyLane(a)));
+  const assigned=member(turn.assigned);
+  const gate=readyGate(turn);
+  let body=`<div class="sheet-grab"></div><div class="sheet-title">Clean ${esc(property.name)}</div>
+    <div class="sheet-sub">${propertyEmoji(turn.propertyId)} Finish by ${fmtTime(turn.readyBy)}${turn.checkin?` · guests ${fmtDay(turn.checkin)}`:''}</div>
+    <div class="plain-note simple-note"><b>Simple rule:</b> tap a row when it is done. Tap it again to undo. Camera means add a photo.</div>`;
+  if(!turn.assigned&&turn.status!=='done'){
+    body+=`<button class="btn primary" data-claim="${turn.id}">I'm doing this</button>`;
+  }
+  body+=`<details class="soft-details"><summary>Who does what</summary>
+    <div class="role-strip">${roleSummary(turn.propertyId,{limit:8})}</div>
+    ${isLeader()?`<div class="mini assigned-mini">Assigned: ${esc(assigned?.name||'Open')}</div><button class="btn ghost small-full" data-assign="${turn.id}">${turn.assigned?'Change person':'Assign person'}</button>`:''}
+  </details>`;
+  groups.forEach(group=>{
+    const groupRole=itemRole(list.find(item=>item.group===group));
+    const def=roleDef(groupRole);
+    const myLane=userRolesForProperty(turn.propertyId).includes(groupRole);
+    body+=`<div class="chk-group-label ${myLane?'mine':''}"><span>${esc(group)}</span><small>${def.emoji} ${esc(def.label)}</small></div>`;
+    list.forEach((item,index)=>{
+      if(item.group!==group) return;
+      const on=Boolean(checks[index]);
+      const hasPhoto=Boolean(photos[index]);
+      const role=itemRole(item);
+      const myItem=userRolesForProperty(turn.propertyId).includes(role);
+      const helper=myItem?'Your job':roleDef(role).label;
+      const camera=item.photo?`<button class="cam ${hasPhoto?'has':item.photo==='required'?'req':''}" data-photo="${turn.id}:${index}" aria-label="Add photo">${hasPhoto?'&#10003;':'&#128247;'}</button>`:'';
+      body+=`<div class="chk ${on?'on':''} ${myItem?'mine':'other-lane'}" data-check="${turn.id}:${index}">
+        <span class="box">&#10003;</span><span class="lbl"><span class="chk-text">${esc(item.label)}</span><small>${esc(helper)}</small></span>${camera}</div>`;
+    });
+  });
+  if(!gate.ok) body+=`<div class="gate-note"><span>&#9888;</span><span>${esc(gate.msg)}</span></div>`;
+  body+=turn.status==='done'
+    ?`<button class="btn ghost" data-reopen="${turn.id}">Re-open job</button>`
+    :`<button class="btn primary" data-done="${turn.id}" ${gate.ok?'':'disabled'}>${gate.ok?'Mark house ready':'Finish checklist first'}</button>`;
+  body+=`<details class="soft-details"><summary>Need help?</summary><button class="btn ghost small-full" data-report="${turn.id}">Report a problem</button></details>`;
+  openSheet(body);
+}
+function renderWater(){
+  const current=WATER_ASSETS.filter(asset=>!testDue(asset).due&&readingStatus(asset.type,latestReading(asset.id)||{})==='good').length;
+  let html=`<div class="simple-hero"><span class="eyebrow">Water</span><h1>Is the water okay?</h1>
+    <div class="simple-chip-row"><span class="simple-chip">${current}/${WATER_ASSETS.length} good</span><span class="simple-chip">Check every 2 days</span></div></div>
+    <details class="soft-details"><summary>How to check water</summary>
+      <div class="simple-list"><span>1. Take pool photos.</span><span>2. Type the strip numbers.</span><span>3. Save the check.</span></div>
+    </details>
+    <p class="sec-label">Pools &amp; hot tubs</p>`;
+  html+=WATER_ASSETS.map(asset=>{
+    const reading=latestReading(asset.id);
+    const score=waterScore(asset,reading);
+    const due=testDue(asset);
+    const reasons=simpleWaterReasons(asset,reading);
+    return `<div class="wa simple-water ${score.className}" data-water="${asset.id}">
+      <div class="wa-top"><div><div class="wa-name">${asset.emoji||propertyEmoji(asset.propertyId)} ${esc(prop(asset.propertyId).name)}</div><div class="wa-prop">${esc(asset.name)}</div></div>
+        <span class="pill ${score.className==='good'?'ready':score.className==='warn'?'needs':'sameday'}">${score.label}</span></div>
+      <div class="simple-list">${reasons.map(reason=>`<span>${esc(reason)}</span>`).join('')}</div>
+      <div class="simple-line">PSI ${friendlyValue(reading?.pressurePsi)} · Level ${esc(waterLevelMeta(reading?.waterLevel).short)} · ${reading?`checked ${due.days===0?'today':`${due.days}d ago`}`:'not checked'}</div>
+      <button class="btn primary" data-log="${asset.id}">Do water check</button>
+    </div>`;
+  }).join('');
+  html+=`<details class="soft-details"><summary>Pool history</summary><button class="btn ghost small-full" data-compliance>Print pool history</button></details>`;
+  return html;
+}
+function openLog(assetId){
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
+  const draft=waterDraft(assetId);
+  const levelValue=draft.values.waterLevel||'';
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Check water</div>
+    <div class="sheet-sub">${asset.emoji||propertyEmoji(asset.propertyId)} ${esc(prop(asset.propertyId).name)} · ${esc(asset.name)}</div>
+    <div class="plain-note simple-note"><b>Three steps:</b> add photos, type the main numbers, save.</div>
+    <details class="soft-details" open><summary>Photos</summary>
+      <div class="photo-capture-grid">${photoTile(asset.id,'pressure')}${photoTile(asset.id,'level')}${photoTile(asset.id,'kit')}</div>
+      <div class="proof-preview-grid">${photoPreview(asset.id,'pressure')}${photoPreview(asset.id,'level')}${photoPreview(asset.id,'kit')}</div>
+    </details>
+    <p class="sec-label">Quick check</p>
+    <div class="reading-grid issue-grid">
+      <div class="field"><label>Pressure</label><input id="in-pressure" type="number" step="1" inputmode="numeric" placeholder="${esc(inputHint(asset,'pressurePsi'))}" value="${esc(draft.values.pressurePsi||'')}"><small class="target">Gauge PSI</small></div>
+      <div class="field"><label>Water level</label><select id="in-level"><option value="">Choose</option>${Object.entries(WATER_LEVELS).map(([value,meta])=>`<option value="${value}" ${levelValue===value?'selected':''}>${esc(meta.label)}</option>`).join('')}</select><small class="target">${esc(asset.levelGuide||'Record the water line.')}</small></div>
+    </div>
+    <p class="sec-label">Main numbers</p>
+    <div class="reading-grid">${CORE_CHEM_FIELDS.map(field=>waterField(asset,field,draft)).join('')}</div>
+    <details class="soft-details"><summary>More numbers</summary><div class="reading-grid issue-grid">${ADVANCED_CHEM_FIELDS.map(field=>waterField(asset,field,draft)).join('')}</div></details>
+    <div class="field"><label>Note</label><input id="in-note" maxlength="180" placeholder="Added tabs, skimmed, cleaned basket..." value="${esc(draft.values.note||'')}"></div>
+    <button class="btn primary" data-savelog="${asset.id}">Save water check</button>`);
+}
+function renderCockpit(){
+  if(!isLeader()) return '';
+  const openAlerts=S.alerts.filter(alert=>!alert.resolved);
+  const urgent=openAlerts.filter(alert=>alert.severity==='urgent');
+  const openTasks=S.tasks.filter(task=>task.status!=='done');
+  const totals=S.financials.reduce((sum,row)=>({
+    revenue:sum.revenue+(Number(row.revenueCents)||0),
+    expenses:sum.expenses+(Number(row.expensesCents)||0),
+    payouts:sum.payouts+(Number(row.cleanerPayoutCents)||0),
+  }),{revenue:0,expenses:0,payouts:0});
+  const net=totals.revenue-totals.expenses-totals.payouts;
+  const propertyScores=PROPERTIES.map(property=>{
+    const waterAssets=WATER_ASSETS.filter(asset=>asset.propertyId===property.id);
+    const waterAvg=waterAssets.length?Math.round(waterAssets.reduce((sum,asset)=>sum+waterScore(asset,latestReading(asset.id)).score,0)/waterAssets.length):100;
+    const activeTurns=S.turns.filter(turn=>turn.propertyId===property.id&&turn.status!=='done'&&turn.checkout&&turn.checkout<=todayISO()).length;
+    const issues=S.tickets.filter(ticket=>ticket.propertyId===property.id&&ticket.status==='open').length;
+    const score=Math.max(0,Math.min(100,waterAvg-(activeTurns*8)-(issues*12)));
+    return {property,score,label:score>=85?'Good':score>=65?'Watch':'Needs help'};
+  });
+  return `<div class="simple-hero"><span class="eyebrow">Ana board</span><h1>${urgent.length?`${urgent.length} things need help`:'Everything is calm'}</h1>
+      <button class="btn primary" data-copybrief>Copy today brief</button></div>
+    <p class="sec-label">Needs help</p>
+    <div class="alert-stack">${openAlerts.slice(0,4).map(alertCard).join('')||'<div class="empty compact-empty">Nothing urgent.</div>'}</div>
+    ${openAlerts.length>4?`<details class="soft-details"><summary>Show all ${openAlerts.length}</summary>${openAlerts.slice(4).map(alertCard).join('')}</details>`:''}
+    <p class="sec-label">Houses</p>
+    <div class="ready-grid">${propertyScores.map(row=>`<div class="ready-card ${row.score>=85?'good':row.score>=65?'warn':'bad'}">
+      <span>${propertyEmoji(row.property.id)}</span><div><b>${esc(row.property.name)}</b><small>${row.label}</small></div><strong>${row.score}%</strong></div>`).join('')}</div>
+    <details class="soft-details"><summary>Owner numbers</summary>
+      <div class="money-grid"><div class="money-card hero"><small>Revenue</small><b>${money(totals.revenue)}</b><span>this month</span></div>
+      <div class="money-card"><small>Net</small><b>${money(net)}</b><span>after costs + payouts</span></div></div>
+      <div class="goal-list">${S.goals.map(goalCard).join('')}</div>
+    </details>
+    <details class="soft-details"><summary>Extra tools</summary>
+      <button class="btn ghost small-full" data-autoassign>Assign open turns</button>
+      <button class="btn ghost small-full" data-addtask>Add task</button>
+      <button class="btn ghost small-full" data-addfinancial>Add numbers</button>
+      <button class="btn danger-outline" data-reset>Reset local demo</button>
+      <p class="sec-label">Future ideas</p><div class="idea-grid">${BUSINESS_IDEAS.map(idea=>`<div class="idea-card"><span>${idea.icon}</span><div><b>${esc(idea.title)}</b><small>${esc(idea.detail)}</small></div></div>`).join('')}</div>
+      <p class="sec-label">Open tasks</p><div class="task-list">${openTasks.length?openTasks.map(taskCard).join(''):'<div class="empty compact-empty">No open tasks.</div>'}</div>
+    </details>`;
+}
+function alertCard(alert){
+  return `<div class="alert-card ${alert.severity==='urgent'?'urgent':'watch'}">
+    <span class="alert-mark">${alert.severity==='urgent'?'!':'·'}</span><div><b>${esc(alert.title)}</b>
+    <small>${esc(alert.detail)}</small><em>${esc(prop(alert.propertyId).name)}</em></div></div>`;
+}
+function renderTeam(){
+  let html=`<div class="simple-hero compact"><span class="eyebrow">Team</span><h1>Who does what?</h1></div>`;
+  html+=TEAM.map(person=>`<div class="row"><span class="pa" style="background:${person.color};color:#20180a">${esc(person.name[0])}</span>
+    <div><div class="rn">${esc(person.name)}</div><div class="rr">${esc(displayRole(person))}</div></div></div>`).join('');
+  html+=`<details class="soft-details" open><summary>House jobs</summary><div class="role-board">${PROPERTIES.map(property=>`<div class="role-house">
+      <div class="role-house-head"><span>${propertyEmoji(property.id)}</span><b>${esc(property.name)}</b></div>
+      <div class="role-strip">${roleSummary(property.id,{limit:8})}</div>
+    </div>`).join('')}</div></details>`;
+  if(isLeader()){
+    html+=`<details class="soft-details"><summary>Owner tools</summary>
+      <button class="btn ghost small-full" data-autoassign>Assign open turns</button>
+      <button class="btn ghost small-full" data-copybrief>Copy today brief</button>
+      <button class="btn danger-outline" data-reset>Reset local demo</button></details>`;
+  }
+  return html;
+}
+
 /* ---------------- reminders, sheet, bindings ---------------- */
 function runReminders(){
   const sameDay=S.turns.filter(turn=>isSameDay(turn)&&turn.status!=='done').length;

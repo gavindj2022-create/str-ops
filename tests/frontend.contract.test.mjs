@@ -101,6 +101,9 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
   for(const phrase of ['Pool check','Pressure PSI','Water level','Cyanuric acid','Guest-ready score','Professional upgrades']){
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
+  for(const phrase of ["I'm doing this",'Open job','Do water check','Check water','Owner numbers','Extra tools','House jobs']){
+    assert.ok(app.includes(phrase),`missing simple UI phrase ${phrase}`);
+  }
   assert.ok(data.includes('BUSINESS_IDEAS'),'missing professional idea board seed');
   assert.match(css,/@media \(max-width:390px\)/);
   assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);

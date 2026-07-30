@@ -98,6 +98,34 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 .empty{text-align:center;color:var(--muted-2);padding:38px 20px;font-size:14px}
 .empty .em-ico{font-size:34px;display:block;margin-bottom:10px;opacity:.5}
+.simple-hero{background:linear-gradient(145deg,rgba(201,164,107,.14),rgba(79,176,198,.10));border:1px solid rgba(201,164,107,.22);border-radius:var(--r-lg);padding:16px;margin:4px 0 14px}
+.simple-hero.compact{padding:14px;margin-bottom:12px}
+.simple-hero .eyebrow{display:block;color:var(--gold);font-size:10px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:4px}
+.simple-hero h1{font-family:'Fraunces',serif;font-size:25px;line-height:1.1;font-weight:500;letter-spacing:-.02em;margin-bottom:10px}
+.simple-hero .btn{margin-top:10px}
+.simple-chip-row{display:flex;flex-wrap:wrap;gap:7px}
+.simple-chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.05);border-radius:99px;padding:6px 9px;font-size:12px;color:var(--bone)}
+.simple-chip.warn{border-color:rgba(229,84,79,.35);background:var(--urgent-bg);color:var(--urgent)}
+.simple-alert{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--urgent-bg);border:1px solid rgba(229,84,79,.28);border-radius:var(--r);padding:12px 14px;color:var(--urgent);margin:0 0 10px}
+.simple-alert b,.simple-alert small{display:block}.simple-alert b{color:var(--bone);font-size:14px}.simple-alert small{font-size:12px;color:var(--urgent)}
+.simple-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:8px}
+.simple-card b,.simple-card small{display:block}.simple-card b{font-size:14px}.simple-card small{font-size:12px;color:var(--muted);margin-top:2px}
+.simple-action{font-size:12px;color:#20180a;background:var(--gold);border-radius:99px;padding:7px 10px;white-space:nowrap}
+.simple-turn .role-strip{display:none}
+.one-button-row{padding:0 14px 14px}.one-button-row .btn{width:100%}
+.soft-details{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin:10px 0}
+.soft-details summary{cursor:pointer;color:var(--gold);font-size:13px;font-weight:500;list-style:none}
+.soft-details summary::-webkit-details-marker{display:none}
+.soft-details summary::after{content:"+";float:right;color:var(--muted)}
+.soft-details[open] summary::after{content:"−"}
+.soft-details .role-strip,.soft-details .goal-list,.soft-details .idea-grid,.soft-details .task-list,.soft-details .money-grid{margin-top:10px}
+.small-full{width:100%;margin-top:10px;padding:11px;font-size:13px}
+.assigned-mini{margin-top:10px;color:var(--muted)}
+.simple-note{margin-top:0}
+.simple-list{display:grid;gap:6px;margin:8px 0}
+.simple-list span{display:block;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--bone)}
+.simple-line{font-size:12px;color:var(--muted);margin:10px 0}
+.simple-water .btn{margin-top:10px}
 
 /* ---------- buttons ---------- */
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:var(--r);border:1px solid var(--line-strong);background:var(--panel-2);font-size:16px;font-weight:500;transition:transform .08s}
@@ -242,7 +270,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .section-heading>span,.section-heading>button{color:var(--muted-2);font-size:11px;margin-bottom:9px}
 .section-heading>button{background:transparent;border:0;color:var(--gold);padding:4px}
 .alert-stack,.goal-list,.task-list,.finance-list{display:grid;gap:8px}
-.alert-card{display:grid;grid-template-columns:24px minmax(0,1fr) 24px;align-items:start;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.alert-card{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:start;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
 .alert-card.urgent{border-color:rgba(229,84,79,.34)}.alert-card.watch{border-color:rgba(224,169,75,.2)}
 .alert-mark{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;background:var(--clean-bg);color:var(--clean);font-weight:600}
 .alert-card.urgent .alert-mark{background:var(--urgent-bg);color:var(--urgent)}
