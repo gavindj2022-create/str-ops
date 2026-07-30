@@ -35,6 +35,7 @@ test('demo state uses canonical camelCase shape and corrected team roles',async(
     assert.ok(Array.isArray(state[key]),`${key} should be seeded`);
   }
   assert.ok(state.turns.every(turn=>'propertyId' in turn&&'readyBy' in turn&&'checkoutTime' in turn));
+  assert.ok(state.readings.some(reading=>'pressurePsi' in reading&&'waterLevel' in reading));
   assert.ok(state.financials.every(row=>'revenueCents' in row&&'cleanerPayoutCents' in row));
   assert.match(iso(new Date()),/^\d{4}-\d{2}-\d{2}$/);
 });
@@ -97,6 +98,10 @@ test('UI contract includes gated cockpit and core phone actions',async()=>{
     assert.ok(app.includes(phrase),`missing ${phrase}`);
   }
   assert.ok(data.includes('Laundry'),'missing Laundry role seed');
+  for(const phrase of ['Pool check','Pressure PSI','Water level','Cyanuric acid','Guest-ready score','Professional upgrades']){
+    assert.ok(app.includes(phrase),`missing ${phrase}`);
+  }
+  assert.ok(data.includes('BUSINESS_IDEAS'),'missing professional idea board seed');
   assert.match(css,/@media \(max-width:390px\)/);
   assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });

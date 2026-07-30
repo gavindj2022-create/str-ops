@@ -180,6 +180,28 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .photo-badge{display:inline-flex;align-items:center;gap:6px;width:max-content;background:var(--ready-bg);border:1px solid rgba(91,185,139,.3);color:var(--ready);border-radius:99px;padding:5px 9px;font-size:11px;margin:0 0 10px}.photo-badge::before{content:"📷"}.photo-badge.wide{margin:0 0 14px;width:100%;justify-content:center}
 .water-thumb,.kit-preview{width:100%;max-height:180px;object-fit:cover;border-radius:var(--r);border:1px solid var(--line);margin:0 0 10px;background:var(--panel-2)}
 .kit-preview{max-height:240px;margin-top:10px}
+.wa.good{border-color:rgba(91,185,139,.22)}.wa.warn{border-color:rgba(224,169,75,.28)}.wa.bad{border-color:rgba(229,84,79,.32)}
+.pro-scan{background:linear-gradient(135deg,rgba(79,176,198,.15),rgba(201,164,107,.10))}
+.pool-reference-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 4px}
+.pool-reference-grid>div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.pool-reference-grid b,.pool-reference-grid small{display:block}.pool-reference-grid b{font-size:12px}.pool-reference-grid small{font-size:10px;color:var(--muted);line-height:1.35;margin-top:3px}
+.pool-ops-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 8px}
+.wa-r.empty .v{color:var(--muted-2)}
+.chem-mini{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 10px}
+.chem-mini span{font-size:10px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-radius:99px;padding:4px 7px}
+.proof-badges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.proof-badges span{font-size:10px;color:var(--ready);background:var(--ready-bg);border:1px solid rgba(91,185,139,.28);border-radius:99px;padding:4px 8px}
+.photo-capture-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.photo-tile{min-height:92px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:10px 8px;text-align:left;display:flex;flex-direction:column;gap:3px}
+.photo-tile.attached{border-color:rgba(91,185,139,.45);background:linear-gradient(145deg,rgba(91,185,139,.11),var(--panel-2))}
+.photo-tile span{font-size:20px}.photo-tile b{font-size:12px}.photo-tile small{font-size:10px;color:var(--muted);line-height:1.25}
+.proof-preview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.proof-preview{margin:0;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.proof-preview img{display:block;width:100%;height:86px;object-fit:cover}
+.proof-preview figcaption{font-size:10px;color:var(--muted);padding:6px 7px;line-height:1.2}
+.advanced-chem{border:1px solid var(--line);border-radius:var(--r);padding:10px 10px 0;margin:6px 0 12px;background:rgba(255,255,255,.025)}
+.advanced-chem summary{font-size:13px;color:var(--gold);cursor:pointer;margin-bottom:10px}
+.safety-note{background:var(--clean-bg);border-color:rgba(224,169,75,.25);color:var(--clean)}
 
 /* team / admin */
 .row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:8px}
@@ -233,6 +255,16 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .task-card.overdue{border-color:rgba(229,84,79,.3)}.task-card>button{width:28px;height:28px;border-radius:9px;background:var(--panel-2);border:1px solid var(--line-strong);color:var(--ready)}.task-card b,.task-card small{display:block}.task-card b{font-size:13px}.task-card small{font-size:10px;color:var(--muted);margin-top:2px}.task-card>span{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--clean)}
 .finance-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}.finance-row b,.finance-row small{display:block}.finance-row b{font-size:13px}.finance-row small{font-size:10px;color:var(--muted-2)}.finance-row>div:last-child{text-align:right}.finance-row strong{font-family:'Fraunces',serif;font-size:16px;font-weight:500}
 .compact-empty{padding:18px}
+.ready-grid,.idea-grid{display:grid;gap:8px}
+.ready-card{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:11px}
+.ready-card.good{border-color:rgba(91,185,139,.3)}.ready-card.warn{border-color:rgba(224,169,75,.32)}.ready-card.bad{border-color:rgba(229,84,79,.32)}
+.ready-card>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--panel-2)}
+.ready-card b,.ready-card small{display:block}.ready-card b{font-size:13px}.ready-card small{font-size:10px;color:var(--muted)}
+.ready-card strong{font-family:'Fraunces',serif;font-weight:500;color:var(--gold)}
+.idea-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.idea-card{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:11px}
+.idea-card>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--water-bg)}
+.idea-card b,.idea-card small{display:block}.idea-card b{font-size:12px}.idea-card small{font-size:10px;color:var(--muted);line-height:1.35;margin-top:2px}
 
 /* ---------- compliance ---------- */
 .streak-card{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(79,176,198,.16),rgba(91,185,139,.1));border:1px solid rgba(79,176,198,.25);border-radius:var(--r-lg);padding:14px;margin-top:4px}
@@ -248,6 +280,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
   .tab{font-size:10px}.tab .tab-ico{font-size:18px}
   .money-card b{font-size:19px}
   .reading-grid{gap:7px}.field input,.field select,.field textarea{padding-left:9px;padding-right:9px}
+  .pool-reference-grid,.photo-capture-grid,.proof-preview-grid{grid-template-columns:1fr}
+  .proof-preview img{height:140px}
+  .idea-grid{grid-template-columns:1fr}
   .wa-foot{align-items:flex-end}.wa-due{max-width:50%}
   .water-actions{flex-direction:column}.water-actions .btn{padding:9px 10px;font-size:12px}
 }

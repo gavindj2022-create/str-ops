@@ -170,10 +170,27 @@ try {
   const reading = await api('/api/water', {
     method: 'POST',
     cookie: managerCookie,
-    body: { assetId: 'westgate-tub', chlorine: 3, ph: 7.4, alk: 100, note: 'Integration test' },
+    body: {
+      assetId: 'westgate-pool',
+      freeChlorine: 2.6,
+      totalChlorine: 3,
+      ph: 7.4,
+      alk: 100,
+      hardness: 250,
+      cyanuricAcid: 50,
+      salt: 3000,
+      pressurePsi: 18,
+      waterLevel: 'slightly_above',
+      note: 'Integration pool check',
+    },
   });
   assert.equal(reading.response.status, 201);
-  assert.equal(reading.payload.assetId, 'westgate-tub');
+  assert.equal(reading.payload.assetId, 'westgate-pool');
+  assert.equal(reading.payload.freeChlorine, 2.6);
+  assert.equal(reading.payload.chlorine, 2.6);
+  assert.equal(reading.payload.pressurePsi, 18);
+  assert.equal(reading.payload.waterLevel, 'slightly_above');
+  assert.equal(reading.payload.cyanuricAcid, 50);
 
   const turnBefore = managerState.payload.turns.find(turn => turn.id === 'demo-turn-westgate');
   const patchedTurn = await api('/api/turns/demo-turn-westgate', {
@@ -270,10 +287,23 @@ try {
   const photoWaterReading = await api('/api/water', {
     method: 'POST',
     cookie: cleanerCookie,
-    body: { assetId: 'hickory-pool', chlorine: 2.4, ph: 7.4, alk: 95, note: 'Photo test log', photoKey: uploadedPhoto.payload.key },
+    body: {
+      assetId: 'hickory-pool',
+      chlorine: 2.4,
+      ph: 7.4,
+      alk: 95,
+      pressurePsi: 17,
+      waterLevel: 'on_arrow',
+      note: 'Photo test log',
+      photoKey: uploadedPhoto.payload.key,
+      pressurePhotoKey: uploadedPhoto.payload.key,
+      levelPhotoKey: uploadedPhoto.payload.key,
+    },
   });
   assert.equal(photoWaterReading.response.status, 201);
   assert.equal(photoWaterReading.payload.photoKey, uploadedPhoto.payload.key);
+  assert.equal(photoWaterReading.payload.pressurePhotoKey, uploadedPhoto.payload.key);
+  assert.equal(photoWaterReading.payload.levelPhotoKey, uploadedPhoto.payload.key);
   photoWaterReadingId = photoWaterReading.payload.id;
 
   const verifiedCheck = await api('/api/turns/demo-turn-hickory/checks/0', {

@@ -1,6 +1,11 @@
 const TARGETS = {
-  pool: { chlorine: [1, 3], ph: [7.2, 7.6], alk: [80, 120] },
-  hottub: { chlorine: [2, 4], ph: [7.2, 7.6], alk: [80, 120] },
+  pool: {
+    chlorine: [1, 3], freeChlorine: [1, 3], ph: [7.2, 7.8], alk: [80, 120],
+    pressurePsi: [10, 25],
+  },
+  hottub: {
+    chlorine: [2, 4], freeChlorine: [2, 4], ph: [7.2, 7.8], alk: [80, 120],
+  },
 };
 
 function queryRows(result) {
@@ -25,12 +30,21 @@ export function chicagoClock(now = new Date(), timeZone = 'America/Chicago') {
 
 export function waterReadingStatus(type, reading) {
   const target = TARGETS[type] || TARGETS.pool;
-  const bad = ['chlorine', 'ph', 'alk'].filter(key => {
-    const value = Number(reading[key]);
+  const chlorineValue = reading.freeChlorine ?? reading.free_chlorine ?? reading.chlorine;
+  const bad = [
+    ['freeChlorine', chlorineValue],
+    ['ph', reading.ph],
+    ['alk', reading.alk],
+  ].filter(([key, raw]) => {
+    const value = Number(raw);
     return value < target[key][0] || value > target[key][1];
-  });
-  if (bad.includes('chlorine')) return 'bad';
-  return bad.length ? 'warn' : 'good';
+  }).map(([key]) => key);
+  const pressure = reading.pressurePsi ?? reading.pressure_psi;
+  const pressureOff = target.pressurePsi && pressure !== null && pressure !== undefined
+    && (Number(pressure) < target.pressurePsi[0] || Number(pressure) > target.pressurePsi[1]);
+  const waterLevel = reading.waterLevel ?? reading.water_level;
+  if (bad.includes('freeChlorine') || waterLevel === 'low') return 'bad';
+  return bad.length || pressureOff || waterLevel === 'high' ? 'warn' : 'good';
 }
 
 function alert({ type, severity, propertyId = null, title, detail, ts, entityId }) {
@@ -129,12 +143,19 @@ export async function computeAlerts(env, now = new Date()) {
   for (const reading of queryRows(latestReadingsResult)) {
     const status = waterReadingStatus(reading.type, reading);
     if (status === 'bad') {
+      const parts = [
+        `free chlorine is ${reading.free_chlorine ?? reading.chlorine}`,
+        `pH is ${reading.ph}`,
+        `alkalinity is ${reading.alk}`,
+      ];
+      if (reading.pressure_psi !== null && reading.pressure_psi !== undefined) parts.push(`pressure is ${reading.pressure_psi} PSI`);
+      if (reading.water_level) parts.push(`water level is ${String(reading.water_level).replaceAll('_', ' ')}`);
       alerts.push(alert({
         type: 'water_bad',
         severity: 'urgent',
         propertyId: reading.property_id,
         title: `${reading.property_name} ${reading.asset_name} needs treatment`,
-        detail: `Latest chlorine is ${reading.chlorine}, pH is ${reading.ph}, alkalinity is ${reading.alk}.`,
+        detail: `Latest ${parts.join(', ')}.`,
         ts: reading.ts,
         entityId: reading.id,
       }));

@@ -71,14 +71,26 @@ ON CONFLICT(id) DO UPDATE SET
   same_day=excluded.same_day, status=excluded.status, assigned_to=excluded.assigned_to,
   started_at=NULL, completed_at=NULL, source=excluded.source, updated_ts=excluded.updated_ts;
 
-INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, logged_by, photo_key) VALUES
-  ('demo-reading-westgate-pool', 'westgate-pool', datetime('now', '-3 day'), 0.6, 7.1, 70, 'Treat and retest', 'anna', NULL),
-  ('demo-reading-westgate-tub', 'westgate-tub', datetime('now', '-1 day'), 3.0, 7.4, 100, NULL, 'anna', NULL),
-  ('demo-reading-hickory-pool', 'hickory-pool', datetime('now', '-1 day'), 2.2, 7.5, 95, NULL, 'anna', NULL),
-  ('demo-reading-hickory-tub', 'hickory-tub', datetime('now', '-6 day'), 2.0, 7.3, 90, 'Overdue test demo', 'anna', NULL)
+INSERT INTO water_readings
+  (id, asset_id, ts, chlorine, free_chlorine, total_chlorine, ph, alk, hardness,
+   cyanuric_acid, salt, pressure_psi, water_level, note, logged_by, photo_key,
+   pressure_photo_key, level_photo_key)
+VALUES
+  ('demo-reading-westgate-pool', 'westgate-pool', datetime('now', '-3 day'), 0.6, 0.6, 1, 7.1, 70, 250,
+   40, 3000, 22, 'low', 'Treat and retest', 'anna', NULL, NULL, NULL),
+  ('demo-reading-westgate-tub', 'westgate-tub', datetime('now', '-1 day'), 3.0, 3.0, 3, 7.4, 100, 250,
+   50, NULL, NULL, 'on_arrow', NULL, 'anna', NULL, NULL, NULL),
+  ('demo-reading-hickory-pool', 'hickory-pool', datetime('now', '-1 day'), 2.2, 2.2, 2, 7.5, 95, 250,
+   50, 3000, 18, 'slightly_above', NULL, 'anna', NULL, NULL, NULL),
+  ('demo-reading-hickory-tub', 'hickory-tub', datetime('now', '-6 day'), 2.0, 2.0, 2, 7.3, 90, 250,
+   40, NULL, NULL, 'on_arrow', 'Overdue test demo', 'anna', NULL, NULL, NULL)
 ON CONFLICT(id) DO UPDATE SET
-  ts=excluded.ts, chlorine=excluded.chlorine, ph=excluded.ph, alk=excluded.alk,
-  note=excluded.note, logged_by=excluded.logged_by, photo_key=excluded.photo_key;
+  ts=excluded.ts, chlorine=excluded.chlorine, free_chlorine=excluded.free_chlorine,
+  total_chlorine=excluded.total_chlorine, ph=excluded.ph, alk=excluded.alk,
+  hardness=excluded.hardness, cyanuric_acid=excluded.cyanuric_acid, salt=excluded.salt,
+  pressure_psi=excluded.pressure_psi, water_level=excluded.water_level,
+  note=excluded.note, logged_by=excluded.logged_by, photo_key=excluded.photo_key,
+  pressure_photo_key=excluded.pressure_photo_key, level_photo_key=excluded.level_photo_key;
 
 INSERT INTO maintenance_tickets
   (id, property_id, opened_ts, opened_by, note, priority, status)

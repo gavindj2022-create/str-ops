@@ -4,7 +4,7 @@ import test from 'node:test';
 import { chicagoClock, waterReadingStatus } from '../worker/alerts.js';
 import { hashPin } from '../worker/auth.js';
 import { parseICal } from '../worker/ical.js';
-import { mapFinancial, mapTurn } from '../worker/mappers.js';
+import { mapFinancial, mapReading, mapTurn } from '../worker/mappers.js';
 
 test('parseICal unfolds lines, preserves times, and skips availability blocks', () => {
   const events = parseICal([
@@ -46,7 +46,9 @@ test('demo PIN hash matches the seeded PBKDF2 hash', async () => {
 test('water status treats chlorine outside target as bad', () => {
   assert.equal(waterReadingStatus('pool', { chlorine: 0.6, ph: 7.4, alk: 100 }), 'bad');
   assert.equal(waterReadingStatus('hottub', { chlorine: 3, ph: 7.4, alk: 100 }), 'good');
-  assert.equal(waterReadingStatus('pool', { chlorine: 2, ph: 7.8, alk: 100 }), 'warn');
+  assert.equal(waterReadingStatus('pool', { chlorine: 2, ph: 8.1, alk: 100 }), 'warn');
+  assert.equal(waterReadingStatus('pool', { freeChlorine: 2, ph: 7.4, alk: 100, pressurePsi: 30 }), 'warn');
+  assert.equal(waterReadingStatus('pool', { free_chlorine: 2, ph: 7.4, alk: 100, water_level: 'low' }), 'bad');
 });
 
 test('Chicago comparisons use the requested timezone', () => {
@@ -97,4 +99,29 @@ test('SQL adapters return camelCase and money stays in cents', () => {
   assert.equal(turn.sameDay, true);
   assert.equal(turn.assignedTo, 'anna');
   assert.ok(!('assigned_to' in turn));
+
+  const reading = mapReading({
+    id: 'r1',
+    asset_id: 'westgate-pool',
+    ts: '2026-07-29T10:00:00.000Z',
+    chlorine: 2.4,
+    free_chlorine: 2.4,
+    total_chlorine: 3,
+    ph: 7.4,
+    alk: 100,
+    hardness: 250,
+    cyanuric_acid: 50,
+    salt: 3000,
+    pressure_psi: 18,
+    water_level: 'slightly_above',
+    note: 'Pool check',
+    photo_key: 'private/strip.png',
+    pressure_photo_key: 'private/gauge.png',
+    level_photo_key: 'private/level.png',
+    logged_by: 'anna',
+  });
+  assert.equal(reading.freeChlorine, 2.4);
+  assert.equal(reading.cyanuricAcid, 50);
+  assert.equal(reading.pressurePsi, 18);
+  assert.equal(reading.levelPhotoKey, 'private/level.png');
 });

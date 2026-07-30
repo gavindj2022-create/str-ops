@@ -44,6 +44,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH = /^\d{4}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const STATUSES = ['needs_cleaning', 'in_progress', 'ready', 'done'];
+const WATER_LEVELS = ['low', 'on_arrow', 'slightly_above', 'high'];
 
 async function all(env, sql, ...bindings) {
   const result = await env.DB.prepare(sql).bind(...bindings).all();
@@ -93,6 +94,24 @@ function timestampValue(value, field) {
 
 function manager(user) {
   return ['dev', 'owner', 'manager'].includes(user.role);
+}
+
+function optionalFinite(value, field, options = {}) {
+  if (value === undefined || value === null || value === '') return null;
+  return finiteNumber(value, field, options);
+}
+
+async function assertPhotoAllowed(env, user, key, label = 'Photo') {
+  if (!key) return;
+  const photo = await firstOr404(
+    env,
+    'SELECT object_key, uploaded_by FROM photo_objects WHERE object_key=?',
+    [key],
+    label,
+  );
+  if (!manager(user) && photo.uploaded_by !== user.id) {
+    throw new HttpError(403, 'forbidden', `That ${label.toLowerCase()} belongs to another team member.`);
+  }
 }
 
 async function stateResponse(env, user) {
@@ -391,26 +410,51 @@ async function handleWater(request, env, user, parts) {
     const body = await readJson(request);
     const readingId = newId('reading');
     const assetId = requiredString(body.assetId, 'assetId', { max: 100 });
-    const chlorine = finiteNumber(body.chlorine, 'chlorine', { min: 0, max: 20 });
+    const freeChlorine = finiteNumber(body.freeChlorine ?? body.chlorine, 'freeChlorine', { min: 0, max: 20 });
+    const chlorine = freeChlorine;
+    const totalChlorine = optionalFinite(body.totalChlorine, 'totalChlorine', { min: 0, max: 20 });
     const ph = finiteNumber(body.ph, 'ph', { min: 0, max: 14 });
     const alk = finiteNumber(body.alk, 'alk', { min: 0, max: 500 });
+    const hardness = optionalFinite(body.hardness, 'hardness', { min: 0, max: 1000 });
+    const cyanuricAcid = optionalFinite(body.cyanuricAcid ?? body.cya, 'cyanuricAcid', { min: 0, max: 300 });
+    const salt = optionalFinite(body.salt, 'salt', { min: 0, max: 10000 });
+    const pressurePsi = optionalFinite(body.pressurePsi, 'pressurePsi', { min: 0, max: 80 });
+    const waterLevel = body.waterLevel === undefined || body.waterLevel === null || body.waterLevel === ''
+      ? null
+      : oneOf(body.waterLevel, 'waterLevel', WATER_LEVELS);
     const note = optionalString(body.note, 'note', { max: 2000 }) ?? null;
     const photoKey = optionalString(body.photoKey, 'photoKey', { max: 500 }) ?? null;
-    if (photoKey) {
-      const photo = await firstOr404(
-        env,
-        'SELECT object_key, uploaded_by FROM photo_objects WHERE object_key=?',
-        [photoKey],
-        'Photo',
-      );
-      if (!manager(user) && photo.uploaded_by !== user.id) {
-        throw new HttpError(403, 'forbidden', 'That water-test photo belongs to another team member.');
-      }
-    }
+    const pressurePhotoKey = optionalString(body.pressurePhotoKey, 'pressurePhotoKey', { max: 500 }) ?? null;
+    const levelPhotoKey = optionalString(body.levelPhotoKey, 'levelPhotoKey', { max: 500 }) ?? null;
+    await assertPhotoAllowed(env, user, photoKey, 'Water-test photo');
+    await assertPhotoAllowed(env, user, pressurePhotoKey, 'Pressure photo');
+    await assertPhotoAllowed(env, user, levelPhotoKey, 'Water-level photo');
     await env.DB.prepare(
-      `INSERT INTO water_readings (id, asset_id, ts, chlorine, ph, alk, note, photo_key, logged_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(readingId, assetId, nowIso(), chlorine, ph, alk, note, photoKey, user.id).run();
+      `INSERT INTO water_readings
+        (id, asset_id, ts, chlorine, free_chlorine, total_chlorine, ph, alk, hardness,
+         cyanuric_acid, salt, pressure_psi, water_level, note, photo_key,
+         pressure_photo_key, level_photo_key, logged_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      readingId,
+      assetId,
+      nowIso(),
+      chlorine,
+      freeChlorine,
+      totalChlorine,
+      ph,
+      alk,
+      hardness,
+      cyanuricAcid,
+      salt,
+      pressurePsi,
+      waterLevel,
+      note,
+      photoKey,
+      pressurePhotoKey,
+      levelPhotoKey,
+      user.id,
+    ).run();
     await audit(env, user, 'create', 'water_reading', readingId);
     return json(mapReading(await firstOr404(
       env,
@@ -843,6 +887,8 @@ async function handlePhotos(request, env, user, parts) {
     await env.DB.prepare('UPDATE turn_checks SET photo_key=NULL WHERE photo_key=?').bind(key).run();
     await env.DB.prepare('UPDATE maintenance_tickets SET photo_key=NULL WHERE photo_key=?').bind(key).run();
     await env.DB.prepare('UPDATE water_readings SET photo_key=NULL WHERE photo_key=?').bind(key).run();
+    await env.DB.prepare('UPDATE water_readings SET pressure_photo_key=NULL WHERE pressure_photo_key=?').bind(key).run();
+    await env.DB.prepare('UPDATE water_readings SET level_photo_key=NULL WHERE level_photo_key=?').bind(key).run();
     await env.DB.prepare('DELETE FROM photo_objects WHERE object_key=?').bind(key).run();
     await audit(env, user, 'delete', 'photo', key);
     return json({ ok: true });
@@ -858,6 +904,8 @@ async function purgeExpiredPhotos(env) {
     await env.DB.prepare('UPDATE turn_checks SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
     await env.DB.prepare('UPDATE maintenance_tickets SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
     await env.DB.prepare('UPDATE water_readings SET photo_key=NULL WHERE photo_key=?').bind(row.object_key).run();
+    await env.DB.prepare('UPDATE water_readings SET pressure_photo_key=NULL WHERE pressure_photo_key=?').bind(row.object_key).run();
+    await env.DB.prepare('UPDATE water_readings SET level_photo_key=NULL WHERE level_photo_key=?').bind(row.object_key).run();
     await env.DB.prepare('DELETE FROM photo_objects WHERE object_key=?').bind(row.object_key).run();
   }
   return expired.length;

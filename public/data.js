@@ -23,6 +23,42 @@ const WATER_ASSETS = [
   { id:'hickory-tub',   propertyId:'hickory',  type:'hottub', name:'Cabana hot tub' },
 ];
 
+const WATER_ASSET_META = {
+  'westgate-pool': {
+    emoji:'🏝️', pressureTarget:[10,25], pressureCleanAt:25,
+    levelGuide:'Water should sit on the skimmer arrow or just above it.',
+  },
+  'westgate-tub': {
+    emoji:'♨️',
+    levelGuide:'Water should cover the jets and stay near the fill line.',
+  },
+  'hickory-pool': {
+    emoji:'🌊', pressureTarget:[10,25], pressureCleanAt:25,
+    levelGuide:'Water should sit on the skimmer arrow or just above it.',
+  },
+  'hickory-tub': {
+    emoji:'🫧',
+    levelGuide:'Water should cover the jets and stay near the fill line.',
+  },
+};
+WATER_ASSETS.forEach(asset=>Object.assign(asset,WATER_ASSET_META[asset.id]||{}));
+
+const WATER_LEVELS = {
+  low: { label:'Below arrow', short:'Low', status:'bad', note:'Add water before the pump runs dry.' },
+  on_arrow: { label:'On arrow', short:'On arrow', status:'good', note:'Good working level.' },
+  slightly_above: { label:'Slightly above arrow', short:'A little above', status:'good', note:'Preferred on hot or busy days.' },
+  high: { label:'Too high', short:'High', status:'warn', note:'Watch it; skimmer may not pull the surface well.' },
+};
+
+const BUSINESS_IDEAS = [
+  { icon:'🏁', title:'Guest-ready score', detail:'One score per house from cleaning, water, supplies, and open issues.' },
+  { icon:'🧭', title:'Ana route board', detail:'Auto-sorts today by house, role lane, same-day pressure, and who owns each lane.' },
+  { icon:'📦', title:'Supply par levels', detail:'Coffee, towels, tabs, strips, paper goods, and reorder points by property.' },
+  { icon:'📸', title:'Proof timeline', detail:'Before/after photos, pool photos, and final walkthroughs in one owner-friendly history.' },
+  { icon:'🔧', title:'Filter + equipment reminders', detail:'Pressure trends can trigger backwash/filter-clean reminders before guests notice.' },
+  { icon:'💬', title:'One-tap owner brief', detail:'Copy a clean daily text Ana can send to Gav, Larry, Gale, or the whole crew.' },
+];
+
 const WORK_ROLES = [
   { id:'clean', label:'Clean', emoji:'🧽' },
   { id:'laundry', label:'Laundry', emoji:'🧺' },
@@ -109,11 +145,46 @@ function seedTurns(){
 }
 function seedReadings(){
   return [
-    { id:'r1', assetId:'westgate-pool', ts:addDays(-3)+'T09:00', chlorine:0.6, ph:7.1, alk:70, photoKey:null }, // low -> needs attention
-    { id:'r2', assetId:'westgate-tub',  ts:addDays(-1)+'T09:00', chlorine:3.0, ph:7.4, alk:100, photoKey:null },
-    { id:'r3', assetId:'hickory-pool',  ts:addDays(-1)+'T10:00', chlorine:2.2, ph:7.5, alk:95, photoKey:null },
-    { id:'r4', assetId:'hickory-tub',   ts:addDays(-6)+'T10:00', chlorine:2.0, ph:7.3, alk:90, photoKey:null }, // stale -> test due
+    {
+      id:'r1', assetId:'westgate-pool', ts:addDays(-3)+'T09:00',
+      chlorine:0.6, freeChlorine:0.6, totalChlorine:1, ph:7.1, alk:70,
+      hardness:250, cyanuricAcid:40, salt:3000, pressurePsi:22, waterLevel:'low',
+      photoKey:null, pressurePhotoKey:null, levelPhotoKey:null
+    }, // low -> needs attention
+    {
+      id:'r2', assetId:'westgate-tub', ts:addDays(-1)+'T09:00',
+      chlorine:3.0, freeChlorine:3.0, totalChlorine:3, ph:7.4, alk:100,
+      hardness:250, cyanuricAcid:50, salt:null, pressurePsi:null, waterLevel:'on_arrow',
+      photoKey:null, pressurePhotoKey:null, levelPhotoKey:null
+    },
+    {
+      id:'r3', assetId:'hickory-pool', ts:addDays(-1)+'T10:00',
+      chlorine:2.2, freeChlorine:2.2, totalChlorine:2, ph:7.5, alk:95,
+      hardness:250, cyanuricAcid:50, salt:3000, pressurePsi:18, waterLevel:'slightly_above',
+      photoKey:null, pressurePhotoKey:null, levelPhotoKey:null
+    },
+    {
+      id:'r4', assetId:'hickory-tub', ts:addDays(-6)+'T10:00',
+      chlorine:2.0, freeChlorine:2.0, totalChlorine:2, ph:7.3, alk:90,
+      hardness:250, cyanuricAcid:40, salt:null, pressurePsi:null, waterLevel:'on_arrow',
+      photoKey:null, pressurePhotoKey:null, levelPhotoKey:null
+    }, // stale -> test due
   ];
+}
+function normalizeReading(reading){
+  return {
+    freeChlorine:reading.freeChlorine??reading.chlorine??null,
+    totalChlorine:reading.totalChlorine??null,
+    hardness:reading.hardness??null,
+    cyanuricAcid:reading.cyanuricAcid??reading.cya??null,
+    salt:reading.salt??null,
+    pressurePsi:reading.pressurePsi??null,
+    waterLevel:reading.waterLevel??null,
+    photoKey:reading.photoKey??null,
+    pressurePhotoKey:reading.pressurePhotoKey??null,
+    levelPhotoKey:reading.levelPhotoKey??null,
+    ...reading,
+  };
 }
 
 function seedFinancials(){
@@ -172,6 +243,7 @@ const DB = {
     s.alerts=s.alerts||seedAlerts();
     s.tickets=s.tickets||seedTickets();
     s.supplies=s.supplies||seedSupplies();
+    s.readings=s.readings.map(normalizeReading);
     s.turns.forEach(turn=>{
       turn.checkoutTime=turn.checkoutTime||'10:00';
       turn.readyBy=turn.readyBy||'16:00';
@@ -186,25 +258,54 @@ const DB = {
 
 /* pool chemistry targets + plain-language dosing */
 const TARGETS = {
-  pool:   { chlorine:[1,3], ph:[7.2,7.6], alk:[80,120] },
-  hottub: { chlorine:[2,4], ph:[7.2,7.6], alk:[80,120] },
+  pool: {
+    freeChlorine:[1,3], chlorine:[1,3], totalChlorine:[1,3], ph:[7.2,7.8], alk:[80,120],
+    hardness:[250,500], cyanuricAcid:[30,100], salt:[2500,3500], pressurePsi:[10,25],
+  },
+  hottub: {
+    freeChlorine:[2,4], chlorine:[2,4], totalChlorine:[2,4], ph:[7.2,7.8], alk:[80,120],
+    hardness:[150,500], cyanuricAcid:[30,100], salt:[2500,3500],
+  },
 };
+function readingValue(r,key){
+  if(key==='freeChlorine'||key==='chlorine') return r.freeChlorine ?? r.chlorine;
+  if(key==='cyanuricAcid') return r.cyanuricAcid ?? r.cya;
+  return r[key];
+}
 function doseAdvice(type, r){
   const t = TARGETS[type]; const tips=[];
-  if(r.chlorine < t.chlorine[0]) tips.push('Add chlorine, level is low');
-  else if(r.chlorine > t.chlorine[1]) tips.push('Hold chlorine, let it drop before guests');
-  if(r.ph < t.ph[0]) tips.push('Add pH up (soda ash)');
-  else if(r.ph > t.ph[1]) tips.push('Add pH down (dry acid)');
-  if(r.alk < t.alk[0]) tips.push('Add alkalinity increaser');
-  else if(r.alk > t.alk[1]) tips.push('Lower alkalinity');
+  const chlorine=readingValue(r,'freeChlorine');
+  if(chlorine < t.freeChlorine[0]) tips.push('Chlorine is low - treat and retest');
+  else if(chlorine > t.freeChlorine[1]) tips.push('Chlorine is high - let it drift down before guests');
+  if(r.ph < t.ph[0]) tips.push('pH is low - adjust up');
+  else if(r.ph > t.ph[1]) tips.push('pH is high - adjust down');
+  if(r.alk < t.alk[0]) tips.push('Alkalinity is low');
+  else if(r.alk > t.alk[1]) tips.push('Alkalinity is high');
+  if(r.pressurePsi!==null&&r.pressurePsi!==undefined&&t.pressurePsi){
+    if(r.pressurePsi<t.pressurePsi[0]) tips.push('Pressure is low - check baskets, water level, and flow');
+    else if(r.pressurePsi>t.pressurePsi[1]) tips.push('Pressure is high - clean/backwash filter and recheck');
+  }
+  const level=WATER_LEVELS[r.waterLevel];
+  if(level&&level.status!=='good') tips.push(level.note);
+  if(['totalChlorine','hardness','cyanuricAcid','salt'].some(key=>{
+    const val=readingValue(r,key); const range=t[key];
+    return range&&val!==null&&val!==undefined&&(val<range[0]||val>range[1]);
+  })) tips.push('One advanced strip number is outside the kit target');
   return tips;
 }
 function readingStatus(type, r){
   const t=TARGETS[type];
-  const off = ['chlorine','ph','alk'].filter(k=>{
-    const key = k==='alk'?'alk':k; const val=r[key];
-    return val < t[k][0] || val > t[k][1];
+  const off = ['freeChlorine','ph','alk'].filter(k=>{
+    const val=readingValue(r,k); const range=t[k];
+    return val===null||val===undefined||val < range[0] || val > range[1];
   });
-  if(off.includes('chlorine')) return 'bad';
-  return off.length ? 'warn' : 'good';
+  const level=WATER_LEVELS[r.waterLevel];
+  const pressure=readingValue(r,'pressurePsi');
+  const pressureOff=t.pressurePsi&&pressure!==null&&pressure!==undefined&&(pressure<t.pressurePsi[0]||pressure>t.pressurePsi[1]);
+  const advancedOff=['totalChlorine','hardness','cyanuricAcid','salt'].some(k=>{
+    const val=readingValue(r,k); const range=t[k];
+    return range&&val!==null&&val!==undefined&&(val<range[0]||val>range[1]);
+  });
+  if(off.includes('freeChlorine')||level?.status==='bad') return 'bad';
+  return off.length||pressureOff||advancedOff||level?.status==='warn' ? 'warn' : 'good';
 }

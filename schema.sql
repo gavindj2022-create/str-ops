@@ -106,10 +106,19 @@ CREATE TABLE IF NOT EXISTS water_readings (
   asset_id TEXT NOT NULL REFERENCES water_assets(id) ON DELETE CASCADE,
   ts TEXT NOT NULL,
   chlorine REAL NOT NULL,
+  free_chlorine REAL,
+  total_chlorine REAL,
   ph REAL NOT NULL,
   alk REAL NOT NULL,
+  hardness REAL,
+  cyanuric_acid REAL,
+  salt REAL,
+  pressure_psi REAL,
+  water_level TEXT,
   note TEXT,
   photo_key TEXT,
+  pressure_photo_key TEXT,
+  level_photo_key TEXT,
   logged_by TEXT REFERENCES team(id) ON DELETE SET NULL
 );
 

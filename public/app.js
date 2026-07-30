@@ -725,6 +725,313 @@ function exportCompliance(){
   setTimeout(()=>printWindow.print(),300);
 }
 
+/* Enhanced pool operations: pressure, water level, strip chemistry, and proof photos. */
+const WATER_PHOTO_KINDS = {
+  kit: { key:'photoKey', icon:'🧪', label:'Strip photo', short:'Strip', help:'Bottle + test strip proof' },
+  pressure: { key:'pressurePhotoKey', icon:'⏱️', label:'Gauge photo', short:'Gauge', help:'Pressure gauge proof' },
+  level: { key:'levelPhotoKey', icon:'🌊', label:'Level photo', short:'Level', help:'Skimmer arrow proof' },
+};
+const CORE_CHEM_FIELDS = [
+  { id:'in-free-cl', key:'freeChlorine', label:'Free chlorine', unit:'ppm', step:'0.1', mode:'decimal', required:true },
+  { id:'in-ph', key:'ph', label:'pH', unit:'', step:'0.1', mode:'decimal', required:true },
+  { id:'in-alk', key:'alk', label:'Alkalinity', unit:'ppm', step:'1', mode:'numeric', required:true },
+];
+const ADVANCED_CHEM_FIELDS = [
+  { id:'in-total-cl', key:'totalChlorine', label:'Total chlorine', unit:'ppm', step:'0.1', mode:'decimal' },
+  { id:'in-hardness', key:'hardness', label:'Hardness', unit:'ppm', step:'1', mode:'numeric' },
+  { id:'in-cya', key:'cyanuricAcid', label:'Cyanuric acid', unit:'ppm', step:'1', mode:'numeric' },
+  { id:'in-salt', key:'salt', label:'Salt', unit:'ppm', step:'1', mode:'numeric' },
+];
+function waterDraft(assetId){
+  WATER_DRAFTS[assetId]=WATER_DRAFTS[assetId]||{photos:{},values:{}};
+  WATER_DRAFTS[assetId].photos=WATER_DRAFTS[assetId].photos||{};
+  WATER_DRAFTS[assetId].values=WATER_DRAFTS[assetId].values||{};
+  return WATER_DRAFTS[assetId];
+}
+function stashWaterForm(assetId){
+  const draft=waterDraft(assetId);
+  [...CORE_CHEM_FIELDS,...ADVANCED_CHEM_FIELDS,{id:'in-pressure',key:'pressurePsi'}].forEach(field=>{
+    const element=$(`#${field.id}`);
+    if(element) draft.values[field.key]=element.value;
+  });
+  const level=$('#in-level');
+  if(level) draft.values.waterLevel=level.value;
+  const note=$('#in-note');
+  if(note) draft.values.note=note.value;
+}
+function photoFor(assetId,kind){
+  return waterDraft(assetId).photos[kind]||{};
+}
+function photoKeys(reading){
+  return ['photoKey','pressurePhotoKey','levelPhotoKey'].map(key=>reading?.[key]).filter(Boolean);
+}
+function firstWaterPhoto(reading){ return photoKeys(reading)[0]||null; }
+function waterLevelMeta(value){ return WATER_LEVELS[value]||{ label:'Not logged', short:'-', status:'empty', note:'Add a water-level check.' }; }
+function friendlyValue(value,empty='-'){
+  return value===null||value===undefined||value===''?empty:value;
+}
+function targetRange(asset,key){
+  const range=TARGETS[asset.type]?.[key]||TARGETS[asset.type]?.[key==='freeChlorine'?'chlorine':key];
+  return range?`${range[0]}-${range[1]}`:'optional';
+}
+function inputHint(asset,key){
+  const latest=latestReading(asset.id)||{};
+  const value=readingValue(latest,key);
+  const target=targetRange(asset,key);
+  return value===null||value===undefined?`Target ${target}`:`Last ${value} / target ${target}`;
+}
+function waterField(asset,field,draft){
+  const unit=field.unit?` <span class="unit">${esc(field.unit)}</span>`:'';
+  const target=targetRange(asset,field.key);
+  return `<div class="field"><label>${esc(field.label)}${unit}</label>
+    <input id="${field.id}" type="number" step="${field.step}" inputmode="${field.mode}" placeholder="${esc(inputHint(asset,field.key))}" value="${esc(draft.values[field.key]||'')}">
+    <small class="target">${field.required?'Required':'Optional'} · ${esc(target)}</small></div>`;
+}
+function pressureClass(asset,value){
+  if(value===null||value===undefined||value==='') return 'empty';
+  const range=TARGETS[asset.type]?.pressurePsi||asset.pressureTarget;
+  if(!range) return 'good';
+  return value<range[0]||value>range[1]?'warn':'good';
+}
+function levelClass(value){ return waterLevelMeta(value).status; }
+function cellClass(type,key,value){
+  const target=TARGETS[type]?.[key]||TARGETS[type]?.[key==='chlorine'?'freeChlorine':key];
+  if(!target||value===null||value===undefined||value==='') return 'empty';
+  return value<target[0]||value>target[1] ? (key==='chlorine'||key==='freeChlorine'?'bad':'warn') : 'good';
+}
+function waterProofBadges(reading){
+  const badges=[
+    [reading?.pressurePhotoKey,'Gauge'],
+    [reading?.levelPhotoKey,'Level'],
+    [reading?.photoKey,'Strip'],
+  ].filter(([key])=>key);
+  return badges.length?`<div class="proof-badges">${badges.map(([,label])=>`<span>${esc(label)} photo</span>`).join('')}</div>`:'';
+}
+function waterScore(asset,reading){
+  if(!reading) return {label:'No check', score:0, className:'bad'};
+  const status=readingStatus(asset.type,reading);
+  const due=testDue(asset);
+  const score=Math.max(0,Math.min(100,
+    (status==='good'?78:status==='warn'?56:32)
+    +(reading.waterLevel?8:0)
+    +(reading.pressurePsi!==null&&reading.pressurePsi!==undefined?7:0)
+    +(photoKeys(reading).length?7:0)
+    -(due.due?18:0)
+  ));
+  return {score,label:score>=85?'Guest-ready':score>=65?'Watch':'Needs care',className:score>=85?'good':score>=65?'warn':'bad'};
+}
+function renderWater(){
+  const current=WATER_ASSETS.filter(asset=>!testDue(asset).due&&readingStatus(asset.type,latestReading(asset.id)||{})==='good').length;
+  const avgScore=Math.round(WATER_ASSETS.reduce((sum,asset)=>sum+waterScore(asset,latestReading(asset.id)).score,0)/WATER_ASSETS.length);
+  let html=`<div class="streak-card"><span class="streak-icon">💧</span><div><b>${avgScore}% water guest-ready score</b>
+    <small>${current} of ${WATER_ASSETS.length} water assets current · pressure, level, strip, and proof photos</small></div></div>
+    <div class="scan-card pro-scan"><span class="streak-icon">📸</span><div><b>Pool check</b><small>Take 3 quick photos: gauge, skimmer arrow, and strip bottle. Then type the numbers from the kit.</small></div></div>
+    <div class="pool-reference-grid">
+      <div><b>⏱️ Pressure gauge</b><small>Log PSI. If it jumps high, clean/backwash and recheck.</small></div>
+      <div><b>🌊 Water level</b><small>Use below / on arrow / a little above / high.</small></div>
+      <div><b>🧪 Chemical strip</b><small>Track free chlorine, pH, alkalinity, CYA, hardness, and salt.</small></div>
+    </div>
+    <p class="sec-label">Pools &amp; hot tubs</p>`;
+  html+=WATER_ASSETS.map(asset=>{
+    const property=prop(asset.propertyId);
+    const reading=latestReading(asset.id);
+    const status=reading?readingStatus(asset.type,reading):'bad';
+    const score=waterScore(asset,reading);
+    const tips=reading?doseAdvice(asset.type,reading):['No reading yet, run a pool check now'];
+    const due=testDue(asset);
+    const free=readingValue(reading||{},'freeChlorine');
+    const level=waterLevelMeta(reading?.waterLevel);
+    const thumbKey=firstWaterPhoto(reading);
+    const thumb=thumbKey?`<img class="water-thumb" src="${esc(photoSrc(thumbKey))}" alt="Pool proof photo">`:'';
+    return `<div class="wa ${score.className}" data-water="${asset.id}">
+      <div class="wa-top"><div><div class="wa-name">${asset.emoji||propertyEmoji(asset.propertyId)} ${esc(asset.name)}</div><div class="wa-prop">${propertyEmoji(asset.propertyId)} ${esc(property.name)}</div></div>
+        <span class="pill ${status==='good'?'ready':status==='warn'?'needs':'sameday'}">${score.label}</span></div>
+      ${thumb}
+      ${waterProofBadges(reading)}
+      <div class="pool-ops-strip">
+        <div class="wa-r ${pressureClass(asset,reading?.pressurePsi)}"><div class="v">${friendlyValue(reading?.pressurePsi)}</div><div class="k">PSI</div></div>
+        <div class="wa-r ${levelClass(reading?.waterLevel)}"><div class="v">${esc(level.short)}</div><div class="k">Level</div></div>
+        <div class="wa-r ${score.className}"><div class="v">${score.score}%</div><div class="k">Ready</div></div>
+      </div>
+      <div class="wa-readout">
+        <div class="wa-r ${cellClass(asset.type,'freeChlorine',free)}"><div class="v">${friendlyValue(free)}</div><div class="k">Free Cl</div></div>
+        <div class="wa-r ${cellClass(asset.type,'ph',reading?.ph)}"><div class="v">${friendlyValue(reading?.ph)}</div><div class="k">pH</div></div>
+        <div class="wa-r ${cellClass(asset.type,'alk',reading?.alk)}"><div class="v">${friendlyValue(reading?.alk)}</div><div class="k">Alk</div></div>
+      </div>
+      ${reading?`<div class="chem-mini">
+        <span>Total Cl ${friendlyValue(reading.totalChlorine)}</span>
+        <span>CYA ${friendlyValue(reading.cyanuricAcid)}</span>
+        <span>Hard ${friendlyValue(reading.hardness)}</span>
+        <span>Salt ${friendlyValue(reading.salt)}</span>
+      </div>`:''}
+      <div class="dose ${tips.length?'':'ok'}">${tips.length?esc(tips.join(' · ')):'All balanced, no action needed'}</div>
+      <div class="wa-foot"><span class="wa-due ${due.due?'over':''}">${reading?`Last checked ${due.days===0?'today':`${due.days}d ago`}`:'Never checked'}${due.due?' · due now':''}</span>
+        <div class="water-actions"><button class="btn ghost small-btn" data-waterphoto="${asset.id}:kit">Strip photo</button><button class="btn primary small-btn" data-log="${asset.id}">Pool check</button></div></div></div>`;
+  }).join('');
+  html+=`<button class="btn ghost" data-compliance>📄 Export pool log</button>`;
+  return html;
+}
+function photoTile(assetId,kind){
+  const meta=WATER_PHOTO_KINDS[kind];
+  const photo=photoFor(assetId,kind);
+  return `<button class="photo-tile ${photo.photoKey?'attached':''}" data-waterphoto="${assetId}:${kind}">
+    <span>${meta.icon}</span><b>${photo.photoKey?'Replace':'Add'} ${esc(meta.short)}</b><small>${esc(meta.help)}</small></button>`;
+}
+function photoPreview(assetId,kind){
+  const meta=WATER_PHOTO_KINDS[kind];
+  const photo=photoFor(assetId,kind);
+  const src=photo.previewUrl||photo.url||photoSrc(photo.photoKey);
+  return src?`<figure class="proof-preview"><img src="${esc(src)}" alt="${esc(meta.label)} preview"><figcaption>${esc(meta.label)} attached${photo.synced===false?' locally':''}</figcaption></figure>`:'';
+}
+function openLog(assetId){
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
+  const draft=waterDraft(assetId);
+  const levelValue=draft.values.waterLevel||'';
+  openSheet(`<div class="sheet-grab"></div><div class="sheet-title">Pool check</div>
+    <div class="sheet-sub">${asset.emoji||propertyEmoji(asset.propertyId)} ${esc(asset.name)} · ${esc(prop(asset.propertyId).name)}</div>
+    <div class="plain-note"><b>Fifth-grade version:</b> take the three proof photos, then type the strip numbers. The app stores the proof and flags what needs attention.</div>
+    <div class="photo-capture-grid">
+      ${photoTile(asset.id,'pressure')}
+      ${photoTile(asset.id,'level')}
+      ${photoTile(asset.id,'kit')}
+    </div>
+    <div class="proof-preview-grid">
+      ${photoPreview(asset.id,'pressure')}
+      ${photoPreview(asset.id,'level')}
+      ${photoPreview(asset.id,'kit')}
+    </div>
+    <div class="reading-grid issue-grid">
+      <div class="field"><label>Pressure PSI <span class="unit">pool gauge</span></label>
+        <input id="in-pressure" type="number" step="1" inputmode="numeric" placeholder="${esc(inputHint(asset,'pressurePsi'))}" value="${esc(draft.values.pressurePsi||'')}">
+        <small class="target">${asset.pressureTarget?`Target ${targetRange(asset,'pressurePsi')}`:'Optional for this asset'}</small></div>
+      <div class="field"><label>Water level</label>
+        <select id="in-level">
+          <option value="">Choose level</option>
+          ${Object.entries(WATER_LEVELS).map(([value,meta])=>`<option value="${value}" ${levelValue===value?'selected':''}>${esc(meta.label)}</option>`).join('')}
+        </select>
+        <small class="target">${esc(asset.levelGuide||'Record the water line.')}</small></div>
+    </div>
+    <p class="sec-label">Core chemistry</p>
+    <div class="reading-grid">${CORE_CHEM_FIELDS.map(field=>waterField(asset,field,draft)).join('')}</div>
+    <details class="advanced-chem" open>
+      <summary>More strip numbers from the bottle</summary>
+      <div class="reading-grid issue-grid">${ADVANCED_CHEM_FIELDS.map(field=>waterField(asset,field,draft)).join('')}</div>
+    </details>
+    <div class="field"><label>What did you add or notice? (optional)</label><input id="in-note" maxlength="180" placeholder="Example: added 2 tabs, skimmed, pressure 18 PSI" value="${esc(draft.values.note||'')}"></div>
+    <div class="plain-note safety-note"><b>Safety note:</b> this tracks readings and suggests what to check. Follow the chemical label and never mix pool chemicals.</div>
+    <button class="btn primary" data-savelog="${asset.id}">Save pool check</button>`);
+}
+function readNumberField(selector,label,{required=false,min=0,max=10000}={}){
+  const element=$(selector);
+  const raw=element?.value.trim()||'';
+  if(!raw){
+    if(required){ toast(`Fill ${label}`); return {ok:false}; }
+    return {ok:true,value:null};
+  }
+  const value=Number(raw);
+  if(!Number.isFinite(value)||value<min||value>max){
+    toast(`Check ${label}`);
+    return {ok:false};
+  }
+  return {ok:true,value};
+}
+function saveLog(assetId){
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
+  const freeResult=readNumberField('#in-free-cl','free chlorine',{required:true,max:20});
+  const phResult=readNumberField('#in-ph','pH',{required:true,max:14});
+  const alkResult=readNumberField('#in-alk','alkalinity',{required:true,max:500});
+  if(!freeResult.ok||!phResult.ok||!alkResult.ok) return;
+  const optionalResults={
+    totalChlorine:readNumberField('#in-total-cl','total chlorine',{max:20}),
+    hardness:readNumberField('#in-hardness','hardness',{max:1000}),
+    cyanuricAcid:readNumberField('#in-cya','cyanuric acid',{max:300}),
+    salt:readNumberField('#in-salt','salt',{max:10000}),
+    pressurePsi:readNumberField('#in-pressure','pressure PSI',{max:80}),
+  };
+  if(Object.values(optionalResults).some(result=>!result.ok)) return;
+  const draft=waterDraft(assetId);
+  const photos=draft.photos||{};
+  const reading={
+    id:`reading-${Date.now()}`,assetId,ts:new Date().toISOString(),
+    chlorine:freeResult.value,freeChlorine:freeResult.value,ph:phResult.value,alk:alkResult.value,
+    totalChlorine:optionalResults.totalChlorine.value,
+    hardness:optionalResults.hardness.value,
+    cyanuricAcid:optionalResults.cyanuricAcid.value,
+    salt:optionalResults.salt.value,
+    pressurePsi:optionalResults.pressurePsi.value,
+    waterLevel:$('#in-level').value||null,
+    note:$('#in-note').value.trim(),recordedBy:USER.id,
+    photoKey:photos.kit?.photoKey||null,
+    pressurePhotoKey:photos.pressure?.photoKey||null,
+    levelPhotoKey:photos.level?.photoKey||null,
+  };
+  const remoteReading={...reading};
+  if(photos.kit?.synced===false) delete remoteReading.photoKey;
+  if(photos.pressure?.synced===false) delete remoteReading.pressurePhotoKey;
+  if(photos.level?.synced===false) delete remoteReading.levelPhotoKey;
+  commit(()=>S.readings.push(reading),()=>API.logWater(remoteReading),{render:false});
+  delete WATER_DRAFTS[assetId];
+  closeSheet();
+  go('water');
+  const tips=doseAdvice(asset.type,reading);
+  toast(tips.length?'Pool check saved with care note':'Pool check saved and guest-ready');
+}
+function captureWaterPhoto(target){
+  const [assetId,rawKind='kit']=String(target).split(':');
+  const kind=WATER_PHOTO_KINDS[rawKind]?rawKind:'kit';
+  const asset=WATER_ASSETS.find(item=>item.id===assetId);
+  if(!asset) return;
+  stashWaterForm(assetId);
+  const meta=WATER_PHOTO_KINDS[kind];
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='image/*';
+  input.capture='environment';
+  input.onchange=async()=>{
+    const file=input.files[0];
+    if(!file) return;
+    const previewUrl=URL.createObjectURL(file);
+    toast(`Uploading ${meta.short.toLowerCase()} photo...`);
+    try{
+      const uploaded=await API.uploadPhoto(file);
+      API_CONNECTED=true;
+      waterDraft(assetId).photos[kind]={photoKey:uploaded.key,synced:true,url:uploaded.url||photoSrc(uploaded.key),previewUrl};
+      openLog(assetId);
+      toast(`${meta.short} photo attached. Confirm the numbers.`);
+    }catch(error){
+      API_CONNECTED=false;
+      waterDraft(assetId).photos[kind]={photoKey:`local-water-${kind}-${Date.now()}`,synced:false,previewUrl};
+      openLog(assetId);
+      toast(`${meta.short} photo attached on this phone only.`);
+    }
+  };
+  input.click();
+}
+function exportCompliance(){
+  const rows=[...S.readings].sort((a,b)=>b.ts.localeCompare(a.ts)).map(reading=>{
+    const asset=WATER_ASSETS.find(item=>item.id===reading.assetId);
+    const property=prop(asset?.propertyId);
+    const when=new Date(reading.ts).toLocaleString('en-US',{timeZone:'America/Chicago'});
+    return `<tr><td>${esc(when)}</td><td>${esc(property.name)}</td><td>${esc(asset?.name||'')}</td>
+      <td>${friendlyValue(reading.pressurePsi)}</td><td>${esc(waterLevelMeta(reading.waterLevel).label)}</td>
+      <td>${friendlyValue(readingValue(reading,'freeChlorine'))}</td><td>${friendlyValue(reading.totalChlorine)}</td>
+      <td>${friendlyValue(reading.ph)}</td><td>${friendlyValue(reading.alk)}</td><td>${friendlyValue(reading.hardness)}</td>
+      <td>${friendlyValue(reading.cyanuricAcid)}</td><td>${friendlyValue(reading.salt)}</td><td>${photoKeys(reading).length}</td><td>${esc(reading.note||'')}</td></tr>`;
+  }).join('');
+  const printWindow=window.open('','_blank');
+  if(!printWindow){ toast('Allow pop-ups to export'); return; }
+  printWindow.document.write(`<html><head><title>STR Pool Operations Log</title><style>
+    body{font-family:Georgia,serif;padding:32px;color:#111}h1{font-size:20px}.sub{color:#555;margin-bottom:18px}
+    table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f2efe9}
+    </style></head><body><h1>Short Term Retreats | Pool Operations Log</h1>
+    <div class="sub">America/Chicago · generated ${esc(new Date().toLocaleString('en-US',{timeZone:'America/Chicago'}))}</div>
+    <table><thead><tr><th>Date/time</th><th>Property</th><th>Asset</th><th>PSI</th><th>Level</th><th>Free Cl</th><th>Total Cl</th><th>pH</th><th>Alk</th><th>Hard</th><th>CYA</th><th>Salt</th><th>Photos</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+  printWindow.document.close();
+  setTimeout(()=>printWindow.print(),300);
+}
+
 /* ---------------- Ops cockpit ---------------- */
 function money(cents){ return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format((Number(cents)||0)/100); }
 function goalDisplay(goal,value){
@@ -742,6 +1049,17 @@ function renderCockpit(){
   const net=totals.revenue-totals.expenses-totals.payouts;
   const openAlerts=S.alerts.filter(alert=>!alert.resolved);
   const openTasks=S.tasks.filter(task=>task.status!=='done');
+  const propertyScores=PROPERTIES.map(property=>{
+    const waterAssets=WATER_ASSETS.filter(asset=>asset.propertyId===property.id);
+    const waterAvg=waterAssets.length
+      ? Math.round(waterAssets.reduce((sum,asset)=>sum+waterScore(asset,latestReading(asset.id)).score,0)/waterAssets.length)
+      : 100;
+    const activeTurns=S.turns.filter(turn=>turn.propertyId===property.id&&turn.status!=='done'&&turn.checkout&&turn.checkout<=todayISO()).length;
+    const issues=S.tickets.filter(ticket=>ticket.propertyId===property.id&&ticket.status==='open').length;
+    const lowSupplies=S.supplies.filter(supply=>supply.propertyId===property.id&&(Number(supply.quantity??supply.count)||0)<=(Number(supply.reorderAt)||0)).length;
+    const score=Math.max(0,Math.min(100,waterAvg-(activeTurns*8)-(issues*12)-(lowSupplies*6)));
+    return {property,score,label:score>=85?'Guest-ready':score>=65?'Watch':'Needs help'};
+  });
   let html=`<div class="cockpit-head"><div><span class="eyebrow">Ops cockpit</span><h1>Today at a glance.</h1></div>
     <span class="live-dot ${API_CONNECTED?'online':''}">${API_CONNECTED?'Live':'Demo'}</span></div>
     <div class="organizer-card">
@@ -754,6 +1072,11 @@ function renderCockpit(){
       <div class="money-card"><small>Property costs</small><b>${money(totals.expenses)}</b><span>recorded expenses</span></div>
       <div class="money-card"><small>Crew pay</small><b>${money(totals.payouts)}</b><span>projected payouts</span></div>
     </div>
+    <div class="section-heading"><p class="sec-label">Guest-ready score</p><span>clean + water + issues</span></div>
+    <div class="ready-grid">${propertyScores.map(row=>`<div class="ready-card ${row.score>=85?'good':row.score>=65?'warn':'bad'}">
+      <span>${propertyEmoji(row.property.id)}</span><div><b>${esc(row.property.name)}</b><small>${row.label}</small></div><strong>${row.score}%</strong></div>`).join('')}</div>
+    <div class="section-heading"><p class="sec-label">Professional upgrades</p><span>brainstorm board</span></div>
+    <div class="idea-grid">${BUSINESS_IDEAS.map(idea=>`<div class="idea-card"><span>${idea.icon}</span><div><b>${esc(idea.title)}</b><small>${esc(idea.detail)}</small></div></div>`).join('')}</div>
     <div class="section-heading"><p class="sec-label">Needs attention</p><span>${openAlerts.length} open</span></div>
     <div class="alert-stack">${openAlerts.map(alertCard).join('')}</div>
     <div class="section-heading"><p class="sec-label">Goals</p><span>${S.goals.length} tracked</span></div>
