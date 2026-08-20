@@ -39,8 +39,8 @@ Fallback demo PINs:
 | Person | Role | PIN |
 |---|---|---|
 | Gav | Dev | `135790` |
-| Gale | Owner | `975310` |
-| Larry | House Manager | `246810` |
+| the property owner | Owner | `975310` |
+| the co-owner | House Manager | `246810` |
 | Ana | Owner + Organizer | `864210` |
 
 `npm run test-version` applies local D1 migrations, refreshes the idempotent demo seed, and
@@ -84,7 +84,7 @@ npx wrangler deploy --dry-run
 2. Create/bind the production `str-ops-photos` R2 bucket.
 3. Set `SESSION_SECRET` with `wrangler secret put SESSION_SECRET`.
 4. Configure Cloudflare Access and the team email allowlist.
-5. Add the seven Airbnb/Vrbo iCal secrets from Gale or Larry.
+5. Add the seven Airbnb/Vrbo iCal secrets from the property owner or the co-owner.
 6. Implement and verify VAPID Web Push delivery.
 7. Deploy with `npm run deploy`, attach `team.shorttermretreats.com`, and run real-phone
    authentication, camera, and acceptance testing.

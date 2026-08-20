@@ -16,7 +16,7 @@ npm run test-version
 ```
 
 Open `http://127.0.0.1:8787`. Local test mode signs in when a name is tapped. Fallback
-PINs are Gav (Dev) `135790`, Gale (Owner) `975310`, Larry (House Manager) `246810`,
+PINs are Gav (Dev) `135790`, the property owner (Owner) `975310`, the co-owner (House Manager) `246810`,
 and Ana (Owner + Organizer) `864210`.
 
 Completed in this checkpoint:
@@ -29,7 +29,7 @@ Completed in this checkpoint:
 - Team claim/start state, turnover windows, issue reporting, safe-water streak, two-day
   test cadence, property emojis/colors, and phone-width layout
 - Per-house role lanes for Clean, Laundry, Water, Inspect, Supplies, and Maintenance.
-  Current seed example: Millpoint Clean = Gav and Millpoint Laundry = Gale.
+  Current seed example: Millpoint Clean = Gav and Millpoint Laundry = the property owner.
 - Progressive API adapter with a localStorage fallback for the test/demo experience
 - Authenticated R2 verification-photo upload, server-enforced checklist/photo gate, and
   invalidation when a photo is deleted or purged
@@ -57,16 +57,16 @@ A **private, phone-first PWA** for **Short Term Retreats (STR)** — 4 waterfron
 rentals near Peoria, IL, run by a tiny team. It shows the team exactly what to clean and
 when (driven by the Airbnb calendar), logs pool + hot tub chemistry, and gives one daily
 overview. **v2 adds an Ops cockpit** (business numbers, tasks/schedule, an exceptions
-feed, goals) for Gav, Gale, Larry, and Ana.
+feed, goals) for Gav, the property owner, the co-owner, and Ana.
 
 - **This is an internal tool, NOT a SaaS.** No sign-up, no multi-tenant, no billing. Do not
   build any of that.
 - **Standalone.** Do NOT wire this into Limitless, Alfred, Discord, or any other system.
-- **Dev:** Gav (Gavin Johnson). **Owners:** Gale and Ana. **House manager:** Larry.
+- **Dev:** Gav (Gavin Johnson). **Owners:** the property owner and Ana. **House manager:** the co-owner.
   Ana is the owner-organizer for assigning work and sending the daily brief.
 
 ### GO-LIVE BLOCKER (call this out to Gav, do not let it stall the build)
-The turnover calendar needs **7 Airbnb/VRBO `.ics` export URLs**. Gale or Larry should
+The turnover calendar needs **7 Airbnb/VRBO `.ics` export URLs**. the property owner or the co-owner should
 export them from the listing calendars. Gav's account should not be treated as the owner.
 **They have never been captured.** Until they arrive, **build and demo entirely on seed
 data** (already in `public/data.js`). The live cutover is a one-step swap (§7). Do not block
@@ -80,7 +80,7 @@ Working v1 demo, verified in-browser. Runs with no build step:
 ```bash
 python -m http.server 8123 --directory public   # then open http://localhost:8123
 ```
-Fallback PINs today: Gav 135790, Gale 975310, Larry 246810, Ana 864210.
+Fallback PINs today: Gav 135790, the property owner 975310, the co-owner 246810, Ana 864210.
 
 - `public/index.html` — app shell + tab bar. `public/styles.css` — the **dark-luxury design
   system** (near-black `#0F0F10`, bone `#F4F1EC`, gold `#C9A46B`, teal `#1F4E5F`, red
@@ -112,9 +112,9 @@ care hints + status, compliance export, same-day-turn red flag, and Ana's copyab
 |---|---|
 | Product type | Internal tool only. No SaaS/multi-tenant/billing. |
 | Reminders | **Web Push + in-app only.** No SMS, no email provider. (ASSUMPTION: push is enough; skip the email digest for now.) |
-| Roles | `dev` (Gav), `owner` (Gale and Ana), `manager` (Larry), `cleaner` for future outside cleaners. See §3. |
+| Roles | `dev` (Gav), `owner` (the property owner and Ana), `manager` (the co-owner), `cleaner` for future outside cleaners. See §3. |
 | Cockpit access | Dev, owner, and house manager see the cockpit. Tasks/schedule/alerts/goals are shared. |
-| Team roster | Seed the actual test roster: Gav, Gale, Larry, Ana. Maria and Jess are stale demo users and should stay inactive. |
+| Team roster | Seed the actual test roster: Gav, the property owner, the co-owner, Ana. Maria and Jess are stale demo users and should stay inactive. |
 | House roles | Hybrid default: each property has role lanes (`clean`, `laundry`, `water`, `inspect`, `supplies`, `maintenance`); Ana can still override turn owner/ops tasks. |
 | Worker visibility | ASSUMPTION: workers see **all** turns (matches v1). Assigned turns are highlighted. |
 | Money source | ASSUMPTION: **manual entry** per property/month in the cockpit; occupancy is **derived** from turns/feed. Wire a "pull from feed × nightly rate" helper but do not depend on it. |
@@ -131,9 +131,9 @@ Anything Gav later corrects overrides these — keep them in one place so they'r
 
 `team.role` now supports **`dev|owner|manager|cleaner`**:
 - **dev** = Gav, app build and test access.
-- **owner** = Gale and Ana. Gale is owner. Ana is owner-organizer with cockpit access,
+- **owner** = the property owner and Ana. the property owner is owner. Ana is owner-organizer with cockpit access,
   assignments, tasks, and the daily brief tool.
-- **manager** = Larry, house manager with operations control.
+- **manager** = the co-owner, house manager with operations control.
 - **cleaner** = future outside cleaner role. The **cockpit tab is hidden** for cleaners.
 
 Keep `isLeaderRole()` true for `dev|owner|manager`, and use `isOwner()` only where
@@ -248,7 +248,7 @@ VEVENT when present.
 
 ## 7. iCal cutover (one step, when the URLs arrive)
 
-1. Gale/Larry export each listing's `.ics` (Availability → Export Calendar). 7 links total.
+1. the property owner/the co-owner export each listing's `.ics` (Availability → Export Calendar). 7 links total.
    The copy-paste ask is drafted in vault `Projects/STR Website/iCal Setup - Ready for
    Tomorrow.md`.
 2. `wrangler secret put ICAL_WESTGATE_AIRBNB` (repeat for all seven).
@@ -305,7 +305,7 @@ wrangler deploy
 ## 11. Verification (how you prove it's done)
 
 - **Backend swap:** clear localStorage, reload → all data still present (it's in D1).
-- **Roles:** log in as Gav (Dev), Gale (Owner), Larry (House Manager), and Ana
+- **Roles:** log in as Gav (Dev), the property owner (Owner), the co-owner (House Manager), and Ana
   (Owner + Organizer) → cockpit visible. If a cleaner is added later, cockpit stays hidden.
 - **Cockpit:** seed a same-day turn + a red pool reading + an unstarted late turn + an open
   ticket → **all four appear in Alerts**. Add a financial row → portfolio total updates. Add
